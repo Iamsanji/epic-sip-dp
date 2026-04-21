@@ -18,6 +18,7 @@ const DashboardPage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [subjectSummary, setSubjectSummary] = useState([]);
   
   // Initialize stats with LocalStorage logic
   const [stats, setStats] = useState([
@@ -61,6 +62,19 @@ const DashboardPage = () => {
 
       // 4. Set Recent Activity (show last 5 logs)
       setRecentActivity(attendanceLogs.slice(0, 5));
+
+      const summaryMap = new Map();
+      attendanceLogs.forEach((log) => {
+        const key = log.subjectCode || 'GENERAL';
+        const current = summaryMap.get(key) || { subjectCode: key, total: 0, present: 0, late: 0, absent: 0 };
+        current.total += 1;
+        if (log.status === 'present') current.present += 1;
+        if (log.status === 'late') current.late += 1;
+        if (log.status === 'absent') current.absent += 1;
+        summaryMap.set(key, current);
+      });
+
+      setSubjectSummary([...summaryMap.values()].sort((a, b) => b.total - a.total).slice(0, 6));
 
     } catch (error) {
       console.error('Error reading LocalStorage:', error);
@@ -209,6 +223,42 @@ const DashboardPage = () => {
                 <tr>
                   <td colSpan="3" className="px-6 py-10 text-center text-slate-400 font-medium">No attendance logs found for today.</td>
                 </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-50 dark:border-slate-800">
+          <h3 className="font-black text-lg dark:text-white">Per Subject Analytics</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 dark:bg-slate-800/50">
+              <tr>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Subject</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Total Logs</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Present</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Late</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Absent</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+              {subjectSummary.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-10 text-sm text-slate-400">No subject analytics yet.</td>
+                </tr>
+              ) : (
+                subjectSummary.map((row) => (
+                  <tr key={row.subjectCode}>
+                    <td className="px-6 py-4 font-bold dark:text-white">{row.subjectCode}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{row.total}</td>
+                    <td className="px-6 py-4 text-sm text-emerald-600 font-bold">{row.present}</td>
+                    <td className="px-6 py-4 text-sm text-amber-600 font-bold">{row.late}</td>
+                    <td className="px-6 py-4 text-sm text-rose-600 font-bold">{row.absent}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

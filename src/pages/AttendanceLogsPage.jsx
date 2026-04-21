@@ -217,6 +217,7 @@ const AttendanceLogsPage = () => {
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase">Student</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase">ID</th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase">Subject</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase">Time</th>
                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase">View</th>
@@ -227,6 +228,7 @@ const AttendanceLogsPage = () => {
                 <tr key={log.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
                   <td className="px-6 py-4 font-bold dark:text-white">{log.studentName}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{log.studentId}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">{log.subjectCode || "General"}</td>
                   <td className="px-6 py-4">{getStatusBadge(log.status)}</td>
                   <td className="px-6 py-4 text-sm text-gray-500">{log.date} {log.time}</td>
                   <td className="px-6 py-4 text-right">
@@ -235,7 +237,7 @@ const AttendanceLogsPage = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-20 text-center text-gray-400 font-medium">No logs found. Try scanning a QR code first!</td>
+                  <td colSpan="6" className="px-6 py-20 text-center text-gray-400 font-medium">No logs found. Try scanning a QR code first!</td>
                 </tr>
               )}
             </tbody>
@@ -267,6 +269,7 @@ const AttendanceLogsPage = () => {
                 <p className="text-xs text-gray-400 font-bold uppercase mb-1">Student</p>
                 <p className="font-bold dark:text-white text-lg">{selectedLog.studentName}</p>
                 <p className="text-sm text-purple-500">{selectedLog.studentId}</p>
+                <p className="text-xs text-gray-400 mt-1">Subject: {selectedLog.subjectCode || "General"}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">

@@ -5,22 +5,26 @@ import {
   UserPlus, 
   Users, 
   Clock,
+  BookOpen,
+  PlayCircle,
   ChevronLeft,
   ChevronRight,
   Settings,
   LogOut
 } from 'lucide-react';
 
-const Sidebar = ({ currentPage, setCurrentPage, onLogout }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+const iconMap = {
+  dashboard: LayoutDashboard,
+  scanner: QrCode,
+  register: UserPlus,
+  students: Users,
+  logs: Clock,
+  book: BookOpen,
+  session: PlayCircle,
+};
 
-  const navItems = [
-    { label: 'Dashboard', key: 'dashboard', icon: LayoutDashboard, color: 'text-blue-400' },
-    { label: 'QR Scanner', key: 'scanner', icon: QrCode, color: 'text-green-400' },
-    { label: 'Register Student', key: 'register', icon: UserPlus, color: 'text-yellow-400' },
-    { label: 'Students List', key: 'students', icon: Users, color: 'text-purple-400' },
-    { label: 'Attendance Logs', key: 'logs', icon: Clock, color: 'text-orange-400' },
-  ];
+const Sidebar = ({ currentPage, setCurrentPage, onLogout, currentUser, navItems = [] }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed);
@@ -81,7 +85,7 @@ const Sidebar = ({ currentPage, setCurrentPage, onLogout }) => {
         <nav className="flex-1 px-3 py-6 overflow-y-auto">
           <ul className="space-y-2">
             {navItems.map((item) => {
-              const Icon = item.icon;
+              const Icon = iconMap[item.icon] || LayoutDashboard;
               const isActive = currentPage === item.key;
               
               return (
@@ -125,6 +129,13 @@ const Sidebar = ({ currentPage, setCurrentPage, onLogout }) => {
 
         {/* Footer actions */}
         <div className="border-t border-gray-700 p-4 space-y-2">
+          {!isCollapsed && currentUser && (
+            <div className="rounded-xl bg-gray-800/70 p-3 text-sm">
+              <p className="font-bold text-white">{currentUser.name}</p>
+              <p className="text-gray-400 uppercase text-xs tracking-widest">{currentUser.role}</p>
+            </div>
+          )}
+
           <button
             className={`
               w-full flex items-center gap-3 px-4 py-3 rounded-xl

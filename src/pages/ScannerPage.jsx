@@ -2,9 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, AlertTriangle, ScanLine } from "lucide-react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import {
+  getActiveSession,
   getAttendanceLogs,
   getLocalDateISO,
   getStudents,
+  getSubjects,
   upsertTodayAttendanceLog,
 } from "../utils/localStorageUtils";
 
@@ -50,6 +52,13 @@ const ScannerPage = () => {
   const startScanner = () => {
     if (scannerStarted) return;
 
+    const activeSession = getActiveSession();
+    if (!activeSession) {
+      setStatus("error");
+      setMessage("No active attendance session. Ask your teacher/admin to open a session first.");
+      return;
+    }
+
     const scanner = new Html5QrcodeScanner(
       "reader",
       {
@@ -73,6 +82,7 @@ const ScannerPage = () => {
           const scannedId = String(decodedText || "").trim();
           const students = getStudents();
           const student = students.find((item) => item.id === scannedId);
+          const liveSession = getActiveSession();
 
           if (!student) {
             setStatus("error");
@@ -80,13 +90,35 @@ const ScannerPage = () => {
             return;
           }
 
+          if (!liveSession) {
+            setStatus("error");
+            setMessage("Session was closed before scan completed.");
+            return;
+          }
+
+          const subjects = getSubjects();
+          const activeSubject = subjects.find((subject) => subject.id === liveSession.subjectId);
+          const isEnrolled = activeSubject?.studentIds?.includes(student.id);
+
+          if (!isEnrolled) {
+            setStatus("error");
+            setMessage(
+              `${student.name} (${student.id}) is not enrolled in ${liveSession.subjectCode || "this subject"}.`
+            );
+            return;
+          }
+
           const nextLog = buildAttendanceLog(student);
+          nextLog.sessionId = liveSession.id;
+          nextLog.subjectId = liveSession.subjectId;
+          nextLog.subjectCode = liveSession.subjectCode;
+          nextLog.subjectTitle = liveSession.subjectTitle;
           const { isUpdate } = upsertTodayAttendanceLog(nextLog);
           const allLogs = getAttendanceLogs();
 
           setStatus("success");
           setMessage(
-            `${isUpdate ? "Attendance Updated" : "Attendance Recorded"}: ${student.name} (${student.id}) - ${nextLog.status.toUpperCase()} | Total Logs: ${allLogs.length}`
+            `${isUpdate ? "Attendance Updated" : "Attendance Recorded"}: ${student.name} (${student.id}) - ${nextLog.status.toUpperCase()} in ${liveSession.subjectCode} | Total Logs: ${allLogs.length}`
           );
         } catch (error) {
           setStatus("error");

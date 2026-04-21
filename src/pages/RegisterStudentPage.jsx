@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { QRCode } from "react-qr-code";
-import { getStudents, saveStudents } from "../utils/localStorageUtils";
+import { getStudents, getUsers, saveStudents, saveUsers } from "../utils/localStorageUtils";
 import {
   UserPlus,
   CheckCircle2,
@@ -61,6 +61,22 @@ const RegisterStudentPage = () => {
 
       const newStudent = { ...normalizedForm };
       saveStudents([...students, newStudent]);
+
+      const users = getUsers();
+      const studentUserExists = users.some((user) => user.username === newStudent.id);
+      if (!studentUserExists) {
+        saveUsers([
+          ...users,
+          {
+            id: `student-${Date.now()}`,
+            name: newStudent.name,
+            role: "student",
+            username: newStudent.id,
+            password: newStudent.id,
+            studentId: newStudent.id,
+          },
+        ]);
+      }
 
       // IMPORTANT: Update state in this specific order
       setSavedStudent(newStudent);
