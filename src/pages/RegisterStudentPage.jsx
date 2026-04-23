@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { QRCode } from "react-qr-code";
 import { getStudents, saveStudents } from "../utils/localStorageUtils";
 import {
   UserPlus,
   CheckCircle2,
-  Download,
   GraduationCap,
   AlertCircle,
-  QrCode as QrIcon,
   Sparkles,
-  Printer,
-  Copy,
-  Check
+  ShieldCheck,
+  QrCode as QrIcon,
 } from "lucide-react";
 
 const RegisterStudentPage = ({ currentUser }) => {
@@ -25,7 +21,6 @@ const RegisterStudentPage = ({ currentUser }) => {
 
   const [savedStudent, setSavedStudent] = useState(null);
   const [message, setMessage] = useState({ text: "", type: "" });
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (message.text) {
@@ -33,13 +28,6 @@ const RegisterStudentPage = ({ currentUser }) => {
       return () => clearTimeout(timer);
     }
   }, [message]);
-
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copied]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -89,87 +77,11 @@ const RegisterStudentPage = ({ currentUser }) => {
     }
   };
 
-  const qrValue = savedStudent?.id ? String(savedStudent.id).trim() : "";
-  const hasValidQR = Boolean(qrValue);
-
-  const downloadQR = () => {
-    try {
-      const svg = document.getElementById("studentQR");
-      if (!svg) {
-        alert("QR Code element not found. Please try again.");
-        return;
-      }
-
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-
-      img.onload = () => {
-        canvas.width = 400;
-        canvas.height = 400;
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 50, 50, 300, 300);
-        
-        // Add watermark
-        ctx.font = "bold 12px Arial";
-        ctx.fillStyle = "#dc2626";
-        ctx.textAlign = "center";
-        ctx.fillText("WMSU Attendance System", canvas.width / 2, canvas.height - 10);
-        
-        const png = canvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = png;
-        link.download = `WMSU-Student-${savedStudent?.id || 'QR'}.png`;
-        link.click();
-      };
-
-      img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-    } catch (err) {
-      console.error("Download Error:", err);
-      alert("Error generating QR code. Please try again.");
-    }
-  };
-
-  const copyStudentId = () => {
-    if (savedStudent?.id) {
-      navigator.clipboard.writeText(savedStudent.id);
-      setCopied(true);
-    }
-  };
-
-  const printQR = () => {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>WMSU Student QR Code - ${savedStudent?.name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-            .qr-container { margin: 20px auto; }
-            .student-info { margin-top: 20px; }
-            .wmsu-header { color: #dc2626; margin-bottom: 20px; }
-          </style>
-        </head>
-        <body>
-          <h1 class="wmsu-header">WMSU Attendance System</h1>
-          <div class="qr-container">${document.getElementById("studentQR").outerHTML}</div>
-          <div class="student-info">
-            <h2>${savedStudent?.name}</h2>
-            <p>Student ID: ${savedStudent?.id}</p>
-            <p>${savedStudent?.course} - Year ${savedStudent?.year || ""} Section ${savedStudent?.section || ""}</p>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.print();
-    printWindow.close();
-  };
+  const hasStudent = Boolean(savedStudent?.id);
 
   return (
     currentUser?.role !== "admin" ? (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
+      <div className="min-h-[60vh] bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
         <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
           <AlertCircle className="mx-auto mb-3 text-red-500" size={28} />
           <p className="text-lg font-bold text-gray-900">Access Restricted</p>
@@ -179,7 +91,7 @@ const RegisterStudentPage = ({ currentUser }) => {
         </div>
       </div>
     ) : (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto w-full px-4 py-4 sm:py-8">
         {/* Header */}
         <div className="mb-6 sm:mb-10">
@@ -303,92 +215,54 @@ const RegisterStudentPage = ({ currentUser }) => {
             </form>
           </div>
 
-          {/* Right Side: QR View */}
+          {/* Right Side: Handoff */}
           <div className="bg-white rounded-3xl shadow-xl border border-red-100 overflow-hidden lg:sticky lg:top-24">
             <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 sm:px-8 py-4">
               <div className="flex items-center gap-3">
                 <QrIcon className="text-white" size={24} />
-                <h3 className="text-xl font-bold text-white">Student QR Code</h3>
+                <h3 className="text-xl font-bold text-white">Student Access</h3>
               </div>
-              <p className="text-red-100 text-sm mt-1">Generate and download QR for attendance</p>
+              <p className="text-red-100 text-sm mt-1">QR access belongs to the student profile after login</p>
             </div>
 
-            <div className="p-5 sm:p-8 flex flex-col items-center justify-center min-h-[360px] sm:min-h-[500px]">
-              {savedStudent && hasValidQR ? (
-                <div className="flex flex-col items-center animate-in zoom-in duration-300 w-full">
-                  {/* QR Code Container */}
-                  <div className="bg-white p-6 rounded-3xl shadow-2xl border-2 border-red-100 mb-6 relative">
-                    <div className="absolute -top-3 -right-3 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold">
-                      WMSU
-                    </div>
-                    <QRCode
-                      id="studentQR"
-                      value={qrValue}
-                      size={190}
-                      level="H"
-                      bgColor="#ffffff"
-                      fgColor="#dc2626"
-                    />
-                  </div>
-                  
-                  {/* Student Info */}
-                  <div className="text-center mb-6 w-full">
-                    <h4 className="text-2xl font-black text-gray-900">{savedStudent.name}</h4>
-                    <div className="flex items-center justify-center gap-2 mt-2">
-                      <p className="text-red-600 font-mono font-bold text-lg">{savedStudent.id}</p>
-                      <button
-                        onClick={copyStudentId}
-                        className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Copy ID"
-                      >
-                        {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-gray-400" />}
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 text-gray-600 mt-3 flex-wrap">
-                      <GraduationCap size={16} />
-                      <span className="font-medium">
-                        {savedStudent.course}
-                      </span>
-                    </div>
-                    <div className="text-gray-500 text-sm mt-1">
-                      {savedStudent.year && `Year ${savedStudent.year}`} 
-                      {savedStudent.year && savedStudent.section && " • "}
-                      {savedStudent.section && `Section ${savedStudent.section}`}
+            <div className="p-5 sm:p-8 min-h-[360px] sm:min-h-[500px] flex items-center justify-center">
+              <div className="w-full max-w-md space-y-4">
+                <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="text-red-600 shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-sm font-bold text-red-700">Recommended flow</p>
+                      <p className="text-sm text-red-600 mt-1">
+                        Register the student here, then let the student log in to their account and use QR from My Profile.
+                      </p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-3 w-full">
-                    <button
-                      onClick={downloadQR}
-                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all transform hover:scale-[1.02]"
-                    >
-                      <Download size={18} /> Download
-                    </button>
-                    <button
-                      onClick={printQR}
-                      className="flex-1 flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all"
-                    >
-                      <Printer size={18} /> Print
-                    </button>
+                {hasStudent ? (
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Last registered student</p>
+                    <div className="mt-2">
+                      <h4 className="text-lg font-black text-gray-900">{savedStudent.name}</h4>
+                      <p className="text-sm font-mono text-red-600">{savedStudent.id}</p>
+                      <p className="text-sm text-gray-600 mt-1">{savedStudent.course}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {savedStudent.year ? `Year ${savedStudent.year}` : ""}
+                        {savedStudent.year && savedStudent.section ? " • " : ""}
+                        {savedStudent.section ? `Section ${savedStudent.section}` : ""}
+                      </p>
+                    </div>
                   </div>
-                  
-                  <div className="mt-6 p-3 bg-red-50 rounded-xl text-center">
-                    <p className="text-xs text-red-600">
-                      <AlertCircle size={12} className="inline mr-1" />
-                      This QR code is used for attendance scanning
+                ) : (
+                  <div className="text-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8">
+                    <QrIcon size={56} className="text-gray-300 mx-auto" />
+                    <p className="text-lg font-bold text-gray-700 mt-4">No student selected</p>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Student QR code will be available from the student profile after login.
                     </p>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <div className="w-32 h-32 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <QrIcon size={64} className="text-gray-300" />
-                  </div>
-                  <p className="text-lg font-bold text-gray-700">No QR Code Generated</p>
-                  <p className="text-sm text-gray-400 mt-2">Fill in the form and register a student<br />to generate their unique QR code</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

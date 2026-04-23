@@ -103,7 +103,7 @@ const SessionsPage = ({ currentUser }) => {
   const recentSessionAudit = auditLogs.filter((log) => log.action.includes("SESSION")).slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto w-full px-4 py-6">
         {/* Header */}
         <div className="mb-6">
@@ -203,7 +203,7 @@ const SessionsPage = ({ currentUser }) => {
             <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4">
               <p className="text-sm font-bold text-red-700">Session Timing Rules</p>
               <p className="text-xs text-red-600 mt-1">
-                Attendance starts when the teacher clicks Start. Students are marked late after the grace period.
+                Attendance starts when the teacher clicks Start. Session closes automatically based on the session time you set below.
               </p>
               <div className="mt-3 grid sm:grid-cols-2 gap-3">
                 <label className="text-xs font-semibold text-gray-600">
@@ -230,7 +230,7 @@ const SessionsPage = ({ currentUser }) => {
                 </label>
               </div>
               <p className="mt-2 text-[11px] text-gray-500">
-                Recommended: Late after 10-15 mins, close after 20-30 mins.
+                Example: if Close after is 15 minutes, the session auto-closes 15 minutes after Start.
               </p>
             </div>
 

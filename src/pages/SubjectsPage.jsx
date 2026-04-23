@@ -3,6 +3,7 @@ import { BookOpen, Trash2, PlusCircle, Users, User, Calendar, Clock, Search, X, 
 import {
   deleteSubject,
   getStudents,
+  parseScheduleDurationMinutes,
   getSubjects,
   getUsers,
   saveSubjects,
@@ -95,10 +96,20 @@ const SubjectsPage = ({ currentUser }) => {
 
     const code = form.code.trim().toUpperCase();
     const title = form.title.trim();
+    const schedule = form.schedule.trim();
     const teacher = teachers.find((item) => item.id === form.teacherId);
+    const scheduleDurationMinutes = parseScheduleDurationMinutes(schedule);
 
-    if (!code || !title || !teacher) {
-      setMessage({ text: "❌ Code, title, and teacher are required.", type: "error" });
+    if (!code || !title || !teacher || !schedule) {
+      setMessage({ text: "❌ Code, title, teacher, and schedule are required.", type: "error" });
+      return;
+    }
+
+    if (!Number.isFinite(scheduleDurationMinutes) || scheduleDurationMinutes <= 0) {
+      setMessage({
+        text: "❌ Schedule must include a valid time range (example: Monday 7:00 - 10:00).",
+        type: "error",
+      });
       return;
     }
 
@@ -114,7 +125,7 @@ const SubjectsPage = ({ currentUser }) => {
       title,
       teacherId: teacher.id,
       teacherName: teacher.name,
-      schedule: form.schedule.trim(),
+      schedule,
       studentIds: form.studentIds,
       createdAt: new Date().toISOString(),
     };
@@ -147,7 +158,7 @@ const SubjectsPage = ({ currentUser }) => {
   const uniqueTeachers = [...new Set(visibleSubjects.map(s => s.teacherId))].length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto w-full px-4 py-6">
         {/* Header */}
         <div className="mb-6">
@@ -323,14 +334,18 @@ const SubjectsPage = ({ currentUser }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Schedule (Optional)
+                      Schedule <span className="text-red-500">*</span>
                     </label>
                     <input
                       value={form.schedule}
                       onChange={(e) => setForm((prev) => ({ ...prev, schedule: e.target.value }))}
-                      placeholder="e.g., MWF 10:00-11:30 AM"
+                      placeholder="e.g., Monday 7:00 - 10:00"
+                      required
                       className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      This time range is used to auto-close attendance sessions.
+                    </p>
                   </div>
                 </div>
 

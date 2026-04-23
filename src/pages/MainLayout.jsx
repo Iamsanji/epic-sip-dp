@@ -20,24 +20,14 @@ const AdminControlsPage = lazy(() => import('./AdminControlsPage'));
 const MainLayout = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     seedDefaultUsers();
     const syncUser = () => setCurrentUser(getCurrentUser());
     window.addEventListener('attendance:data-changed', syncUser);
-    
-    // Handle window resize for mobile menu
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsMobileMenuOpen(false);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('attendance:data-changed', syncUser);
-      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -85,7 +75,6 @@ const MainLayout = () => {
   const handleLogout = () => {
     logoutCurrentUser();
     setCurrentUser(null);
-    setIsMobileMenuOpen(false);
   };
 
   const renderPage = () => {
@@ -123,48 +112,18 @@ const MainLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        className="lg:hidden fixed top-3 left-3 z-50 p-2 bg-white rounded-lg shadow-lg border border-red-100"
-      >
-        <div className="w-6 h-5 flex flex-col justify-between">
-          <span className={`w-full h-0.5 bg-red-600 transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-2' : ''}`}></span>
-          <span className={`w-full h-0.5 bg-red-600 transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></span>
-          <span className={`w-full h-0.5 bg-red-600 transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-2' : ''}`}></span>
-        </div>
-      </button>
-
-      {/* Overlay for mobile */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
+      <Suspense fallback={<div className="h-screen w-72 bg-white border-r border-red-100" />}>
+        <Sidebar
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          navItems={navItems}
+          onLogout={handleLogout}
+          currentUser={currentUser}
         />
-      )}
-
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:relative z-40
-        transition-all duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <Suspense fallback={<div className="h-screen w-72 bg-white border-r border-red-100" />}>
-          <Sidebar
-            currentPage={currentPage}
-            setCurrentPage={(page) => {
-              setCurrentPage(page);
-              setIsMobileMenuOpen(false);
-            }}
-            navItems={navItems}
-            onLogout={handleLogout}
-            currentUser={currentUser}
-          />
-        </Suspense>
-      </div>
+      </Suspense>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen overflow-x-hidden">
+      <main className="flex-1 min-h-screen overflow-x-clip">
         {/* Top Bar */}
         <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-red-100 pl-16 pr-4 py-3 sm:px-6 sm:py-4 lg:hidden">
           <div className="flex items-center justify-between">

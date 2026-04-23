@@ -79,7 +79,7 @@ const StudentProfilePage = ({ currentUser }) => {
 
   if (!student) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
+      <div className="min-h-[60vh] bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 max-w-md text-center shadow-lg border border-red-100">
           <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No Student Record Found</h3>
@@ -90,7 +90,7 @@ const StudentProfilePage = ({ currentUser }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-6xl mx-auto w-full px-4 py-4 sm:py-5">
         {/* Header */}
         <div className="flex flex-col items-start sm:flex-row sm:items-center gap-3 mb-5">

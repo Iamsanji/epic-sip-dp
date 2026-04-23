@@ -133,7 +133,7 @@ const DashboardPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-white flex justify-center items-center">
+      <div className="min-h-[60vh] bg-gradient-to-br from-red-50 to-white flex justify-center items-center">
         <div className="text-center">
           <div className="relative">
             <div className="h-20 w-20 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto mb-6"></div>
@@ -147,7 +147,7 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="space-y-6 w-full max-w-7xl mx-auto px-4 py-4 sm:py-6">
         {/* Header Section with WMSU Branding */}
         <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-4 sm:p-6">

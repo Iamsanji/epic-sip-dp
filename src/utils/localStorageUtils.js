@@ -27,6 +27,103 @@ const safeParse = (value, fallback) => {
 
 const pad = (value) => String(value).padStart(2, '0');
 
+const formatMinutesToClock = (minutes, baseDate = new Date()) => {
+  const totalMinutes = Number(minutes);
+  if (!Number.isFinite(totalMinutes)) {
+    return '';
+  }
+
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const mins = ((totalMinutes % 60) + 60) % 60;
+  const dateValue = new Date(baseDate);
+  dateValue.setHours(hours, mins, 0, 0);
+
+  return dateValue.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const parseHourMinute = (hourText, minuteText, meridiem) => {
+  const hour = Number(hourText);
+  const minute = Number(minuteText || '0');
+
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) {
+      return null;
+    }
+
+    const normalizedHour = hour % 12;
+    return meridiem === 'pm' ? normalizedHour * 60 + minute + 12 * 60 : normalizedHour * 60 + minute;
+  }
+
+  if (hour < 0 || hour > 23) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+};
+
+export const parseScheduleDurationMinutes = (scheduleText) => {
+  const schedule = String(scheduleText || '').trim();
+  if (!schedule) {
+    return null;
+  }
+
+  const timeRangeMatch = schedule.match(
+    /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i
+  );
+
+  if (!timeRangeMatch) {
+    return null;
+  }
+
+  const [, startHourText, startMinuteText, rawStartMeridiem, endHourText, endMinuteText, rawEndMeridiem] =
+    timeRangeMatch;
+  const startMeridiem = (rawStartMeridiem || rawEndMeridiem || '').toLowerCase() || null;
+  const endMeridiem = (rawEndMeridiem || rawStartMeridiem || '').toLowerCase() || null;
+
+  const startMinutes = parseHourMinute(startHourText, startMinuteText, startMeridiem);
+  const endMinutesBase = parseHourMinute(endHourText, endMinuteText, endMeridiem);
+
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutesBase)) {
+    return null;
+  }
+
+  let duration = endMinutesBase - startMinutes;
+  if (duration <= 0) {
+    duration += 24 * 60;
+  }
+
+  if (duration <= 0 || duration > 12 * 60) {
+    return null;
+  }
+
+  return duration;
+};
+
+export const getSubjectSessionTimingRules = (scheduleText, preferredLateGraceMinutes = 15) => {
+  const durationMinutes = parseScheduleDurationMinutes(scheduleText);
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+    return null;
+  }
+
+  const safePreferredLate = Number.isFinite(Number(preferredLateGraceMinutes))
+    ? Math.max(0, Number(preferredLateGraceMinutes))
+    : 15;
+  const lateGraceMinutes = Math.min(durationMinutes - 1, Math.min(180, safePreferredLate));
+
+  return {
+    durationMinutes,
+    lateGraceMinutes: Math.max(0, lateGraceMinutes),
+    closeAfterMinutes: durationMinutes,
+  };
+};
+
 export const getLocalDateISO = (date = new Date()) => {
   const year = date.getFullYear();
   const month = pad(date.getMonth() + 1);
@@ -288,9 +385,58 @@ const normalizeSession = (session) => ({
   closeMinutes: Number.isFinite(Number(session?.closeMinutes)) ? Number(session.closeMinutes) : null,
   lateGraceMinutes: Number.isFinite(Number(session?.lateGraceMinutes)) ? Number(session.lateGraceMinutes) : 15,
   closeAfterMinutes: Number.isFinite(Number(session?.closeAfterMinutes)) ? Number(session.closeAfterMinutes) : 30,
+  scheduleDurationMinutes: Number.isFinite(Number(session?.scheduleDurationMinutes))
+    ? Number(session.scheduleDurationMinutes)
+    : null,
   endTime: String(session?.endTime || '').trim(),
   status: String(session?.status || 'OPEN').trim().toUpperCase(),
 });
+
+const getSessionCloseTimestamp = (session) => {
+  const closeMinutes = Number(session?.closeMinutes);
+  const dateISO = String(session?.dateISO || '').trim();
+
+  if (Number.isFinite(closeMinutes) && dateISO) {
+    const sessionDate = new Date(`${dateISO}T00:00:00`);
+    if (!Number.isNaN(sessionDate.getTime())) {
+      return sessionDate.getTime() + closeMinutes * 60 * 1000;
+    }
+  }
+
+  if (dateISO) {
+    const sessionDate = new Date(`${dateISO}T23:59:59`);
+    if (!Number.isNaN(sessionDate.getTime())) {
+      return sessionDate.getTime();
+    }
+  }
+
+  return null;
+};
+
+const applySessionAutoClose = (sessions, now = new Date()) => {
+  const currentTime = now.getTime();
+  let hasChanges = false;
+
+  const nextSessions = sessions.map((session) => {
+    if (session.status !== 'OPEN') {
+      return session;
+    }
+
+    const closeTimestamp = getSessionCloseTimestamp(session);
+    if (!Number.isFinite(closeTimestamp) || closeTimestamp >= currentTime) {
+      return session;
+    }
+
+    hasChanges = true;
+    return {
+      ...session,
+      status: 'CLOSED',
+      endTime: session.endTime || session.closeTime || formatMinutesToClock(session.closeMinutes, now),
+    };
+  });
+
+  return { nextSessions, hasChanges };
+};
 
 const normalizeAuditLog = (log) => ({
   id: String(log?.id || `audit-${Date.now()}`).trim(),
@@ -606,10 +752,16 @@ export const getAttendanceSessions = () => {
     return [];
   }
 
-  return raw
+  const normalized = raw
     .map(normalizeSession)
-    .filter((session) => session.id && session.subjectId)
-    .sort((a, b) => {
+    .filter((session) => session.id && session.subjectId);
+
+  const { nextSessions, hasChanges } = applySessionAutoClose(normalized);
+  if (hasChanges) {
+    localStorage.setItem(STORAGE_KEYS.attendanceSessions, JSON.stringify(nextSessions));
+  }
+
+  return nextSessions.sort((a, b) => {
       const aTime = new Date(`${a.dateISO} ${a.startTime || '00:00:00'}`).getTime();
       const bTime = new Date(`${b.dateISO} ${b.startTime || '00:00:00'}`).getTime();
       return bTime - aTime;
@@ -672,16 +824,6 @@ export const startAttendanceSession = ({ subject, teacher, timing }) => {
   const startMinutes = now.getHours() * 60 + now.getMinutes();
   const lateCutoffMinutes = startMinutes + lateGraceMinutes;
   const closeMinutes = startMinutes + closeAfterMinutes;
-  const toTimeLabel = (minutes) => {
-    const hours = Math.floor((minutes % (24 * 60)) / 60);
-    const mins = minutes % 60;
-    const dateValue = new Date(now);
-    dateValue.setHours(hours, mins, 0, 0);
-    return dateValue.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   const session = normalizeSession({
     id: `session-${Date.now()}`,
@@ -696,13 +838,14 @@ export const startAttendanceSession = ({ subject, teacher, timing }) => {
       minute: '2-digit',
       second: '2-digit',
     }),
-    lateCutoffTime: toTimeLabel(lateCutoffMinutes),
-    closeTime: toTimeLabel(closeMinutes),
+    lateCutoffTime: formatMinutesToClock(lateCutoffMinutes, now),
+    closeTime: formatMinutesToClock(closeMinutes, now),
     startMinutes,
     lateCutoffMinutes,
     closeMinutes,
     lateGraceMinutes,
     closeAfterMinutes,
+    scheduleDurationMinutes: parseScheduleDurationMinutes(subject?.schedule),
     endTime: '',
     status: 'OPEN',
   });

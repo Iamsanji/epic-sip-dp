@@ -205,7 +205,7 @@ const StudentsListPage = ({ currentUser }) => {
   const yearLevels = ["", "1", "2", "3", "4"];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto w-full px-4 py-6">
         {/* Header */}
         <div className="mb-6">

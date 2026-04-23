@@ -246,7 +246,7 @@ const ScannerPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col">
         {/* Header - Compact */}
         <div className="flex-shrink-0 mb-4">

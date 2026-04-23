@@ -246,7 +246,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
 
   if (currentUser?.role === 'student') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
+      <div className="min-h-[60vh] bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
         <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm">
           <AlertCircle className="mx-auto mb-3 text-red-500" size={28} />
           <p className="text-lg font-bold text-gray-900">Access Restricted</p>
@@ -260,7 +260,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex justify-center items-center">
+      <div className="min-h-[60vh] bg-gradient-to-br from-red-50 via-white to-red-50 flex justify-center items-center">
         <div className="text-center">
           <div className="relative">
             <div className="h-16 w-16 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mx-auto mb-4"></div>
@@ -272,7 +272,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+    <div className="min-h-full bg-gradient-to-br from-red-50 via-white to-red-50">
       <div className="max-w-7xl mx-auto w-full px-4 py-6">
         {/* Header */}
         <div className="mb-6">

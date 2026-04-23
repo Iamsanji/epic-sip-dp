@@ -58,41 +58,50 @@ const Logo = ({ size = "md", collapsed = false }) => {
 const Sidebar = ({ currentPage, setCurrentPage, onLogout, currentUser, navItems = [] }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
+      const nextIsDesktop = window.innerWidth >= 1024;
+      setIsDesktop(nextIsDesktop);
+      if (nextIsDesktop) {
         setIsMobileOpen(false);
       }
     };
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (!isDesktop) {
+      setIsMobileOpen(false);
+    }
+  }, [currentPage, isDesktop]);
+
   const toggleSidebar = () => {
-    if (window.innerWidth < 1024) {
-      setIsMobileOpen(!isMobileOpen);
+    if (isDesktop) {
+      setIsCollapsed((prev) => !prev);
     } else {
-      setIsCollapsed(!isCollapsed);
+      setIsMobileOpen((prev) => !prev);
     }
   };
 
   const closeSidebar = () => {
-    if (window.innerWidth < 1024) {
+    if (!isDesktop) {
       setIsMobileOpen(false);
     }
   };
 
-  const isSidebarVisible = window.innerWidth >= 1024 ? true : isMobileOpen;
-  const isCollapsedState = window.innerWidth >= 1024 ? isCollapsed : false;
+  const isCollapsedState = isDesktop ? isCollapsed : false;
 
   return (
     <>
       {/* Mobile Menu Button */}
       <button
         onClick={toggleSidebar}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 bg-white rounded-xl shadow-lg border border-red-100 hover:bg-red-50 transition-all duration-200"
+        aria-label={isMobileOpen ? 'Close sidebar' : 'Open sidebar'}
+        className="lg:hidden fixed top-3 left-3 z-50 p-2.5 bg-white rounded-xl shadow-lg border border-red-100 hover:bg-red-50 transition-all duration-200"
       >
         <Menu size={20} className="text-red-600" />
       </button>
@@ -110,7 +119,7 @@ const Sidebar = ({ currentPage, setCurrentPage, onLogout, currentUser, navItems 
         fixed lg:sticky top-0 z-40
         bg-white text-gray-800 h-screen transition-all duration-500 ease-in-out
         flex flex-col shadow-2xl border-r border-gray-100
-        ${isCollapsedState ? 'w-20' : 'w-72'}
+        ${isCollapsedState ? 'w-20' : 'w-72 sm:w-80 lg:w-72'}
         ${isMobileOpen ? 'left-0' : '-left-full lg:left-0'}
       `}>
         
