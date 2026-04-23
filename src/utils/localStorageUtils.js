@@ -7,7 +7,7 @@ const STORAGE_KEYS = {
   users: 'users',
   subjects: 'subjects',
   attendanceSessions: 'attendance_sessions',
-  activeSessionId: 'attendance_active_session_id',
+  auditLogs: 'attendance_audit_logs',
   currentUser: 'attendance_current_user',
   settings: 'settings',
 };
@@ -83,6 +83,15 @@ export const getStudents = () => {
   return raw
     .map(normalizeStudent)
     .filter((student) => student.id && student.name && student.course);
+};
+
+export const getStudentById = (studentId) => {
+  const safeStudentId = String(studentId || '').trim();
+  if (!safeStudentId) {
+    return null;
+  }
+
+  return getStudents().find((student) => student.id === safeStudentId) || null;
 };
 
 export const saveStudents = (students) => {
@@ -197,7 +206,6 @@ export const updateStudentAndAttendance = (oldStudentId, updatedStudent) => {
 
   const students = getStudents();
   const logs = getAttendanceLogs();
-  const users = getUsers();
 
   const studentIndex = students.findIndex((student) => student.id === safeOldId);
   if (studentIndex < 0) {
@@ -225,29 +233,8 @@ export const updateStudentAndAttendance = (oldStudentId, updatedStudent) => {
     };
   });
 
-  const nextUsers = users.map((user) => {
-    if (user.role !== 'student') {
-      return user;
-    }
-
-    const linkedById = user.studentId === safeOldId;
-    const linkedByUsername = user.username === safeOldId;
-    if (!linkedById && !linkedByUsername) {
-      return user;
-    }
-
-    return {
-      ...user,
-      name: normalizedStudent.name,
-      studentId: normalizedStudent.id,
-      username: linkedByUsername ? normalizedStudent.id : user.username,
-      password: linkedByUsername ? normalizedStudent.id : user.password,
-    };
-  });
-
   localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(nextStudents));
   localStorage.setItem(STORAGE_KEYS.attendanceLogs, JSON.stringify(nextLogs));
-  localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(nextUsers));
   notifyDataChanged();
 
   return { updatedStudent: true, updatedLogsCount };
@@ -294,9 +281,62 @@ const normalizeSession = (session) => ({
   teacherName: String(session?.teacherName || '').trim(),
   dateISO: String(session?.dateISO || getLocalDateISO()).trim(),
   startTime: String(session?.startTime || '').trim(),
+  lateCutoffTime: String(session?.lateCutoffTime || '').trim(),
+  closeTime: String(session?.closeTime || '').trim(),
+  startMinutes: Number.isFinite(Number(session?.startMinutes)) ? Number(session.startMinutes) : null,
+  lateCutoffMinutes: Number.isFinite(Number(session?.lateCutoffMinutes)) ? Number(session.lateCutoffMinutes) : null,
+  closeMinutes: Number.isFinite(Number(session?.closeMinutes)) ? Number(session.closeMinutes) : null,
+  lateGraceMinutes: Number.isFinite(Number(session?.lateGraceMinutes)) ? Number(session.lateGraceMinutes) : 15,
+  closeAfterMinutes: Number.isFinite(Number(session?.closeAfterMinutes)) ? Number(session.closeAfterMinutes) : 30,
   endTime: String(session?.endTime || '').trim(),
   status: String(session?.status || 'OPEN').trim().toUpperCase(),
 });
+
+const normalizeAuditLog = (log) => ({
+  id: String(log?.id || `audit-${Date.now()}`).trim(),
+  timestamp: String(log?.timestamp || new Date().toISOString()).trim(),
+  action: String(log?.action || '').trim(),
+  entityType: String(log?.entityType || '').trim(),
+  entityId: String(log?.entityId || '').trim(),
+  actorId: String(log?.actorId || '').trim(),
+  actorName: String(log?.actorName || '').trim(),
+  details: String(log?.details || '').trim(),
+});
+
+export const getAuditLogs = () => {
+  const raw = safeParse(localStorage.getItem(STORAGE_KEYS.auditLogs), []);
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map(normalizeAuditLog)
+    .filter((log) => log.id && log.timestamp && log.action)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+};
+
+export const addAuditLog = ({ action, entityType, entityId, actorId, actorName, details }) => {
+  const logs = getAuditLogs();
+  const next = normalizeAuditLog({
+    id: `audit-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    timestamp: new Date().toISOString(),
+    action,
+    entityType,
+    entityId,
+    actorId,
+    actorName,
+    details,
+  });
+
+  if (!next.action) {
+    return null;
+  }
+
+  const capped = [next, ...logs].slice(0, 500);
+  localStorage.setItem(STORAGE_KEYS.auditLogs, JSON.stringify(capped));
+  notifyDataChanged();
+  return next;
+};
 
 export const getUsers = () => {
   const raw = safeParse(localStorage.getItem(STORAGE_KEYS.users), []);
@@ -316,6 +356,108 @@ export const saveUsers = (users) => {
 
   localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(safeUsers));
   notifyDataChanged();
+};
+
+export const createTeacherAccount = ({ name, username, password }, actor = null) => {
+  const safeName = String(name || '').trim();
+  const safeUsername = String(username || '').trim();
+  const safePassword = String(password || '').trim();
+
+  if (!safeName || !safeUsername || !safePassword) {
+    throw new Error('Name, username, and password are required.');
+  }
+
+  const users = getUsers();
+  const exists = users.some((user) => user.username.toLowerCase() === safeUsername.toLowerCase());
+  if (exists) {
+    throw new Error('Username already exists.');
+  }
+
+  const nextTeacher = normalizeUser({
+    id: `teacher-${Date.now()}`,
+    name: safeName,
+    role: 'teacher',
+    username: safeUsername,
+    password: safePassword,
+    studentId: '',
+  });
+
+  saveUsers([...users, nextTeacher]);
+
+  addAuditLog({
+    action: 'TEACHER_ACCOUNT_CREATED',
+    entityType: 'user',
+    entityId: nextTeacher.id,
+    actorId: actor?.id || '',
+    actorName: actor?.name || 'System',
+    details: `Teacher account created for ${nextTeacher.name} (${nextTeacher.username}).`,
+  });
+
+  return nextTeacher;
+};
+
+export const updateTeacherAccount = (
+  teacherId,
+  { name, username, password },
+  actor = null
+) => {
+  const safeTeacherId = String(teacherId || '').trim();
+  if (!safeTeacherId) {
+    throw new Error('Teacher ID is required.');
+  }
+
+  const users = getUsers();
+  const index = users.findIndex((user) => user.id === safeTeacherId && user.role === 'teacher');
+  if (index < 0) {
+    throw new Error('Teacher account not found.');
+  }
+
+  const current = users[index];
+  const nextName = String(name ?? current.name).trim();
+  const nextUsername = String(username ?? current.username).trim();
+  const nextPassword = String(password ?? current.password).trim();
+
+  if (!nextName || !nextUsername || !nextPassword) {
+    throw new Error('Name, username, and password are required.');
+  }
+
+  const usernameTaken = users.some(
+    (user) => user.id !== safeTeacherId && user.username.toLowerCase() === nextUsername.toLowerCase()
+  );
+
+  if (usernameTaken) {
+    throw new Error('Username already exists.');
+  }
+
+  const updated = normalizeUser({
+    ...current,
+    name: nextName,
+    username: nextUsername,
+    password: nextPassword,
+  });
+
+  const nextUsers = [...users];
+  nextUsers[index] = updated;
+  saveUsers(nextUsers);
+
+  // Keep subject teacherName in sync when a teacher display name changes.
+  const subjects = getSubjects();
+  const nextSubjects = subjects.map((subject) =>
+    subject.teacherId === updated.id ? { ...subject, teacherName: updated.name } : subject
+  );
+  localStorage.setItem(STORAGE_KEYS.subjects, JSON.stringify(nextSubjects));
+
+  addAuditLog({
+    action: 'TEACHER_ACCOUNT_UPDATED',
+    entityType: 'user',
+    entityId: updated.id,
+    actorId: actor?.id || '',
+    actorName: actor?.name || 'System',
+    details: `Teacher account updated for ${updated.name} (${updated.username}).`,
+  });
+
+  notifyDataChanged();
+  return updated;
 };
 
 export const seedDefaultUsers = () => {
@@ -339,14 +481,6 @@ export const seedDefaultUsers = () => {
       role: 'teacher',
       username: 'teacher',
       password: 'teacher123',
-      studentId: '',
-    },
-    {
-      id: 'student-001',
-      name: 'Student User',
-      role: 'student',
-      username: 'student',
-      password: 'student123',
       studentId: '',
     },
   ];
@@ -422,15 +556,48 @@ export const deleteSubject = (subjectId) => {
   localStorage.setItem(STORAGE_KEYS.attendanceSessions, JSON.stringify(nextSessions));
   localStorage.setItem(STORAGE_KEYS.attendanceLogs, JSON.stringify(nextLogs));
 
-  const activeSessionId = localStorage.getItem(STORAGE_KEYS.activeSessionId);
-  if (activeSessionId) {
-    const stillExists = nextSessions.some((session) => session.id === activeSessionId);
-    if (!stillExists) {
-      localStorage.removeItem(STORAGE_KEYS.activeSessionId);
-    }
+  notifyDataChanged();
+};
+
+export const reassignSubjectTeacher = (subjectId, teacherId, actor = null) => {
+  const safeSubjectId = String(subjectId || '').trim();
+  const safeTeacherId = String(teacherId || '').trim();
+
+  if (!safeSubjectId || !safeTeacherId) {
+    throw new Error('Subject and teacher are required.');
   }
 
-  notifyDataChanged();
+  const subjects = getSubjects();
+  const subjectIndex = subjects.findIndex((subject) => subject.id === safeSubjectId);
+  if (subjectIndex < 0) {
+    throw new Error('Subject not found.');
+  }
+
+  const teacher = getUsers().find((user) => user.id === safeTeacherId && user.role === 'teacher');
+  if (!teacher) {
+    throw new Error('Teacher account not found.');
+  }
+
+  const oldTeacherName = subjects[subjectIndex].teacherName || 'Unassigned';
+  const nextSubjects = [...subjects];
+  nextSubjects[subjectIndex] = {
+    ...nextSubjects[subjectIndex],
+    teacherId: teacher.id,
+    teacherName: teacher.name,
+  };
+
+  saveSubjects(nextSubjects);
+
+  addAuditLog({
+    action: 'SUBJECT_TEACHER_REASSIGNED',
+    entityType: 'subject',
+    entityId: safeSubjectId,
+    actorId: actor?.id || '',
+    actorName: actor?.name || 'System',
+    details: `${nextSubjects[subjectIndex].code} reassigned from ${oldTeacherName} to ${teacher.name}.`,
+  });
+
+  return nextSubjects[subjectIndex];
 };
 
 export const getAttendanceSessions = () => {
@@ -461,20 +628,61 @@ export const saveAttendanceSessions = (sessions) => {
 };
 
 export const getActiveSession = () => {
-  const activeSessionId = String(localStorage.getItem(STORAGE_KEYS.activeSessionId) || '').trim();
-  if (!activeSessionId) {
+  const sessions = getAttendanceSessions();
+
+  return sessions.find((session) => session.status === 'OPEN') || null;
+};
+
+export const getOpenAttendanceSessions = () => getAttendanceSessions().filter((session) => session.status === 'OPEN');
+
+export const getActiveSessionForSubject = (subjectId) => {
+  const safeSubjectId = String(subjectId || '').trim();
+  if (!safeSubjectId) {
     return null;
   }
 
-  const sessions = getAttendanceSessions();
-  const active = sessions.find((session) => session.id === activeSessionId && session.status === 'OPEN');
-  return active || null;
+  return getOpenAttendanceSessions().find((session) => session.subjectId === safeSubjectId) || null;
 };
 
-export const startAttendanceSession = ({ subject, teacher }) => {
+export const startAttendanceSession = ({ subject, teacher, timing }) => {
   const sessions = getAttendanceSessions();
+  const safeSubjectId = String(subject?.id || '').trim();
+
+  if (!safeSubjectId) {
+    throw new Error('Subject is required to start a session.');
+  }
+
+  const assignedTeacherId = String(subject?.teacherId || '').trim();
+  if (!assignedTeacherId) {
+    throw new Error('This subject has no assigned teacher. Assign one before starting a session.');
+  }
+
+  if (String(teacher?.role || '').toLowerCase() === 'teacher' && String(teacher?.id || '').trim() !== assignedTeacherId) {
+    throw new Error('You can only start sessions for subjects assigned to your account.');
+  }
+
+  const lateGraceMinutes = Number.isFinite(Number(timing?.lateGraceMinutes))
+    ? Math.max(0, Math.min(180, Number(timing.lateGraceMinutes)))
+    : 15;
+  const closeAfterMinutes = Number.isFinite(Number(timing?.closeAfterMinutes))
+    ? Math.max(lateGraceMinutes, Math.min(360, Number(timing.closeAfterMinutes)))
+    : Math.max(lateGraceMinutes, 30);
 
   const now = new Date();
+  const startMinutes = now.getHours() * 60 + now.getMinutes();
+  const lateCutoffMinutes = startMinutes + lateGraceMinutes;
+  const closeMinutes = startMinutes + closeAfterMinutes;
+  const toTimeLabel = (minutes) => {
+    const hours = Math.floor((minutes % (24 * 60)) / 60);
+    const mins = minutes % 60;
+    const dateValue = new Date(now);
+    dateValue.setHours(hours, mins, 0, 0);
+    return dateValue.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   const session = normalizeSession({
     id: `session-${Date.now()}`,
     subjectId: subject?.id,
@@ -488,12 +696,19 @@ export const startAttendanceSession = ({ subject, teacher }) => {
       minute: '2-digit',
       second: '2-digit',
     }),
+    lateCutoffTime: toTimeLabel(lateCutoffMinutes),
+    closeTime: toTimeLabel(closeMinutes),
+    startMinutes,
+    lateCutoffMinutes,
+    closeMinutes,
+    lateGraceMinutes,
+    closeAfterMinutes,
     endTime: '',
     status: 'OPEN',
   });
 
   const nextSessions = sessions.map((item) =>
-    item.status === 'OPEN'
+    item.status === 'OPEN' && item.subjectId === safeSubjectId
       ? {
           ...item,
           status: 'CLOSED',
@@ -508,18 +723,40 @@ export const startAttendanceSession = ({ subject, teacher }) => {
       : item
   );
 
+  const autoClosedCount = sessions.filter(
+    (item) => item.status === 'OPEN' && item.subjectId === safeSubjectId
+  ).length;
+
   nextSessions.unshift(session);
   localStorage.setItem(STORAGE_KEYS.attendanceSessions, JSON.stringify(nextSessions));
-  localStorage.setItem(STORAGE_KEYS.activeSessionId, session.id);
+  addAuditLog({
+    action: 'SESSION_STARTED',
+    entityType: 'session',
+    entityId: session.id,
+    actorId: teacher?.id || '',
+    actorName: teacher?.name || 'System',
+    details: `Session started for ${session.subjectCode}. Present window starts immediately, late after ${session.lateCutoffTime}, closes at ${session.closeTime}. ${
+      autoClosedCount > 0 ? `${autoClosedCount} previous open session(s) auto-closed.` : 'No previous open session.'
+    }`,
+  });
   notifyDataChanged();
 
   return session;
 };
 
-export const closeAttendanceSession = (sessionId) => {
+export const closeAttendanceSession = (sessionId, actor = null) => {
   const safeSessionId = String(sessionId || '').trim();
   const sessions = getAttendanceSessions();
   const now = new Date();
+
+  const target = sessions.find((session) => session.id === safeSessionId);
+  if (!target) {
+    throw new Error('Session not found.');
+  }
+
+  if (String(actor?.role || '').toLowerCase() === 'teacher' && String(actor?.id || '').trim() !== String(target.teacherId || '').trim()) {
+    throw new Error('You can only close sessions that were started for your assigned subject.');
+  }
 
   const nextSessions = sessions.map((session) => {
     if (session.id !== safeSessionId) {
@@ -541,10 +778,14 @@ export const closeAttendanceSession = (sessionId) => {
 
   localStorage.setItem(STORAGE_KEYS.attendanceSessions, JSON.stringify(nextSessions));
 
-  const activeSessionId = String(localStorage.getItem(STORAGE_KEYS.activeSessionId) || '').trim();
-  if (activeSessionId === safeSessionId) {
-    localStorage.removeItem(STORAGE_KEYS.activeSessionId);
-  }
+  addAuditLog({
+    action: 'SESSION_CLOSED',
+    entityType: 'session',
+    entityId: safeSessionId,
+    actorId: actor?.id || '',
+    actorName: actor?.name || 'System',
+    details: `Session closed for ${target.subjectCode}.`,
+  });
 
   notifyDataChanged();
 };
