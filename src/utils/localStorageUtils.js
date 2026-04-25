@@ -137,6 +137,7 @@ const normalizeStudent = (student) => ({
   course: String(student?.course ?? '').trim(),
   year: String(student?.year ?? '').trim(),
   section: String(student?.section ?? '').trim(),
+  profileImage: String(student?.profileImage ?? '').trim(),
 });
 
 const normalizeAttendanceLog = (log) => {
@@ -335,6 +336,30 @@ export const updateStudentAndAttendance = (oldStudentId, updatedStudent) => {
   notifyDataChanged();
 
   return { updatedStudent: true, updatedLogsCount };
+};
+
+export const updateStudentProfileImage = (studentId, profileImage) => {
+  const safeStudentId = String(studentId || '').trim();
+  const safeProfileImage = String(profileImage || '').trim();
+
+  if (!safeStudentId) {
+    throw new Error('Student ID is required.');
+  }
+
+  const students = getStudents();
+  const studentIndex = students.findIndex((student) => student.id === safeStudentId);
+  if (studentIndex < 0) {
+    throw new Error('Student record not found.');
+  }
+
+  const nextStudents = [...students];
+  nextStudents[studentIndex] = normalizeStudent({
+    ...nextStudents[studentIndex],
+    profileImage: safeProfileImage,
+  });
+
+  saveStudents(nextStudents);
+  return nextStudents[studentIndex];
 };
 
 export const getSettings = () => {

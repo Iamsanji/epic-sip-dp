@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BookOpen, Trash2, PlusCircle, Users, User, Calendar, Clock, Search, X, CheckCircle, AlertCircle, Filter } from "lucide-react";
+import { BookOpen, Trash2, PlusCircle, Users, User, Calendar, Clock, Search, X, CheckCircle, AlertCircle, Pencil, Save } from "lucide-react";
 import {
   deleteSubject,
   getStudents,
@@ -15,6 +15,8 @@ const SubjectsPage = ({ currentUser }) => {
   const [teachers, setTeachers] = useState([]);
   const [message, setMessage] = useState({ text: "", type: "" });
   const [showForm, setShowForm] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState("");
+  const [editingStudentIds, setEditingStudentIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTeacher, setFilterTeacher] = useState("");
   const [form, setForm] = useState({
@@ -152,6 +154,60 @@ const SubjectsPage = ({ currentUser }) => {
     deleteSubject(subjectId);
     setMessage({ text: "✅ Subject and related data removed successfully.", type: "success" });
     window.dispatchEvent(new CustomEvent('attendance:data-changed'));
+  };
+
+  const startEditEnrollment = (subject) => {
+    if (currentUser?.role !== "admin") {
+      setMessage({ text: "❌ Only admins can edit subject enrollments.", type: "error" });
+      return;
+    }
+
+    setEditingSubjectId(subject.id);
+    setEditingStudentIds(Array.isArray(subject.studentIds) ? [...subject.studentIds] : []);
+  };
+
+  const cancelEditEnrollment = () => {
+    setEditingSubjectId("");
+    setEditingStudentIds([]);
+  };
+
+  const toggleEditStudent = (studentId) => {
+    setEditingStudentIds((prev) => {
+      const exists = prev.includes(studentId);
+      return exists ? prev.filter((id) => id !== studentId) : [...prev, studentId];
+    });
+  };
+
+  const selectAllEditStudents = () => {
+    if (editingStudentIds.length === students.length) {
+      setEditingStudentIds([]);
+      return;
+    }
+
+    setEditingStudentIds(students.map((student) => student.id));
+  };
+
+  const saveEnrollmentChanges = (subjectId) => {
+    if (currentUser?.role !== "admin") {
+      setMessage({ text: "❌ Only admins can edit subject enrollments.", type: "error" });
+      return;
+    }
+
+    const subject = subjects.find((item) => item.id === subjectId);
+    if (!subject) {
+      setMessage({ text: "❌ Subject not found.", type: "error" });
+      return;
+    }
+
+    const nextSubjects = subjects.map((item) =>
+      item.id === subjectId ? { ...item, studentIds: [...new Set(editingStudentIds)] } : item
+    );
+
+    saveSubjects(nextSubjects);
+    setEditingSubjectId("");
+    setEditingStudentIds([]);
+    setMessage({ text: `✅ Enrollment updated for ${subject.code}.`, type: "success" });
+    window.dispatchEvent(new CustomEvent("attendance:data-changed"));
   };
 
   const totalStudents = visibleSubjects.reduce((sum, subject) => sum + subject.studentIds.length, 0);
@@ -462,7 +518,7 @@ const SubjectsPage = ({ currentUser }) => {
                           <span>Enrolled: <span className="font-semibold">{subject.studentIds.length} students</span></span>
                         </div>
                       </div>
-                      {subject.studentIds.length > 0 && (
+                      {subject.studentIds.length > 0 && editingSubjectId !== subject.id && (
                         <div className="mt-3 flex flex-wrap gap-1">
                           <span className="text-xs text-gray-400">Enrolled IDs:</span>
                           {subject.studentIds.slice(0, 5).map(id => {
@@ -478,16 +534,83 @@ const SubjectsPage = ({ currentUser }) => {
                           )}
                         </div>
                       )}
+
+                      {editingSubjectId === subject.id && (
+                        <div className="mt-4 rounded-xl border border-red-200 bg-white p-3">
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <p className="text-sm font-bold text-gray-800">Edit Enrolled Students</p>
+                            {students.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={selectAllEditStudents}
+                                className="text-xs font-semibold text-red-600 hover:text-red-700"
+                              >
+                                {editingStudentIds.length === students.length ? "Deselect All" : "Select All"}
+                              </button>
+                            )}
+                          </div>
+                          <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 grid sm:grid-cols-2 gap-2 bg-gray-50">
+                            {students.length === 0 ? (
+                              <p className="text-sm text-gray-400 col-span-2 text-center py-4">No students registered yet.</p>
+                            ) : (
+                              students.map((student) => (
+                                <label
+                                  key={student.id}
+                                  className="flex items-center gap-2 text-sm p-2 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={editingStudentIds.includes(student.id)}
+                                    onChange={() => toggleEditStudent(student.id)}
+                                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                  />
+                                  <span className="text-gray-700">{student.name}</span>
+                                  <span className="text-xs text-gray-400 ml-auto">{student.id}</span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">{editingStudentIds.length} student(s) selected</p>
+                        </div>
+                      )}
                     </div>
 
                     {currentUser?.role === "admin" && (
-                      <button
-                        onClick={() => removeSubject(subject.id)}
-                        className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all transform hover:scale-105 self-start"
-                        title="Delete Subject"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <div className="flex items-center gap-2 self-start">
+                        {editingSubjectId === subject.id ? (
+                          <>
+                            <button
+                              onClick={() => saveEnrollmentChanges(subject.id)}
+                              className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg transition-all transform hover:scale-105"
+                              title="Save Enrollment"
+                            >
+                              <Save size={18} />
+                            </button>
+                            <button
+                              onClick={cancelEditEnrollment}
+                              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all transform hover:scale-105"
+                              title="Cancel"
+                            >
+                              <X size={18} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => startEditEnrollment(subject)}
+                            className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-all transform hover:scale-105"
+                            title="Edit Enrolled Students"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeSubject(subject.id)}
+                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all transform hover:scale-105"
+                          title="Delete Subject"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

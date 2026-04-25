@@ -1,17 +1,148 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { QRCode } from "react-qr-code";
-import { Download, QrCode, User, CalendarCheck2, Clock3, UserX, GraduationCap, Award, TrendingUp, AlertCircle, ChevronRight } from "lucide-react";
-import { getAttendanceLogs, getStudentById } from "../utils/localStorageUtils";
+import { jsPDF } from "jspdf";
+import {
+  Download,
+  QrCode,
+  User,
+  CalendarCheck2,
+  Clock3,
+  UserX,
+  GraduationCap,
+  Award,
+  TrendingUp,
+  AlertCircle,
+  ImagePlus,
+  BookOpen,
+  FileDown,
+  Trash2,
+} from "lucide-react";
+import {
+  getAttendanceLogs,
+  getStudentById,
+  getSubjects,
+  updateStudentProfileImage,
+} from "../utils/localStorageUtils";
+
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+const DAY_KEYWORDS = {
+  monday: "Monday",
+  mon: "Monday",
+  tuesday: "Tuesday",
+  tue: "Tuesday",
+  tues: "Tuesday",
+  wednesday: "Wednesday",
+  wed: "Wednesday",
+  thursday: "Thursday",
+  thu: "Thursday",
+  thur: "Thursday",
+  thurs: "Thursday",
+  friday: "Friday",
+  fri: "Friday",
+  saturday: "Saturday",
+  sat: "Saturday",
+  sunday: "Sunday",
+  sun: "Sunday",
+};
+
+const getDaysFromSchedule = (schedule) => {
+  const text = String(schedule || "").trim().toLowerCase();
+  if (!text) {
+    return [];
+  }
+
+  const days = new Set();
+
+  if (/\bmwf\b/i.test(text)) {
+    days.add("Monday");
+    days.add("Wednesday");
+    days.add("Friday");
+  }
+
+  if (/\btt?h\b/i.test(text) || /\btth\b/i.test(text)) {
+    days.add("Tuesday");
+    days.add("Thursday");
+  }
+
+  Object.entries(DAY_KEYWORDS).forEach(([keyword, day]) => {
+    const pattern = new RegExp(`\\b${keyword}\\b`, "i");
+    if (pattern.test(text)) {
+      days.add(day);
+    }
+  });
+
+  return WEEK_DAYS.filter((day) => days.has(day));
+};
+
+const getTimeRangeFromSchedule = (schedule) => {
+  const text = String(schedule || "").trim();
+  const match = text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*[-–—]\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+  return match ? match[1] : "Time not set";
+};
 
 const StudentProfilePage = ({ currentUser }) => {
   const studentId = String(currentUser?.id || currentUser?.studentId || currentUser?.username || "").trim();
-  const student = useMemo(() => getStudentById(studentId), [studentId]);
-  const logs = getAttendanceLogs();
+  const [student, setStudent] = useState(() => getStudentById(studentId));
+  const [logs, setLogs] = useState(() => getAttendanceLogs());
+  const [subjects, setSubjects] = useState(() => getSubjects());
+  const [notice, setNotice] = useState({ text: "", type: "" });
+
+  useEffect(() => {
+    const sync = () => {
+      setStudent(getStudentById(studentId));
+      setLogs(getAttendanceLogs());
+      setSubjects(getSubjects());
+    };
+
+    sync();
+    window.addEventListener("attendance:data-changed", sync);
+    return () => window.removeEventListener("attendance:data-changed", sync);
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!notice.text) return;
+    const timer = setTimeout(() => setNotice({ text: "", type: "" }), 2800);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const myLogs = useMemo(() => {
     if (!student) return [];
     return logs.filter((log) => log.studentId === student.id);
   }, [logs, student]);
+
+  const enrolledSubjects = useMemo(() => {
+    if (!student) return [];
+    return subjects.filter((subject) => subject.studentIds?.includes(student.id));
+  }, [subjects, student]);
+
+  const weeklySchedule = useMemo(() => {
+    const scheduleMap = WEEK_DAYS.reduce((acc, day) => {
+      acc[day] = [];
+      return acc;
+    }, {});
+
+    enrolledSubjects.forEach((subject) => {
+      const days = getDaysFromSchedule(subject.schedule);
+      const timeRange = getTimeRangeFromSchedule(subject.schedule);
+
+      if (days.length === 0) {
+        return;
+      }
+
+      days.forEach((day) => {
+        scheduleMap[day].push({
+          code: subject.code,
+          title: subject.title,
+          teacherName: subject.teacherName || "Unassigned",
+          schedule: subject.schedule || "",
+          timeRange,
+        });
+      });
+    });
+
+    return scheduleMap;
+  }, [enrolledSubjects]);
 
   const present = myLogs.filter((log) => log.status === "present").length;
   const late = myLogs.filter((log) => log.status === "late").length;
@@ -77,6 +208,108 @@ const StudentProfilePage = ({ currentUser }) => {
     }
   };
 
+  const handleProfileImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !student) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setNotice({ text: "Please upload a valid image file.", type: "error" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setNotice({ text: "Image is too large. Maximum file size is 2MB.", type: "error" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const nextStudent = updateStudentProfileImage(student.id, String(reader.result || ""));
+        setStudent(nextStudent);
+        setNotice({ text: "Profile picture updated.", type: "success" });
+      } catch {
+        setNotice({ text: "Failed to update profile picture.", type: "error" });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeProfileImage = () => {
+    if (!student) {
+      return;
+    }
+
+    try {
+      const nextStudent = updateStudentProfileImage(student.id, "");
+      setStudent(nextStudent);
+      setNotice({ text: "Profile picture removed.", type: "success" });
+    } catch {
+      setNotice({ text: "Failed to remove profile picture.", type: "error" });
+    }
+  };
+
+  const downloadSchedulePdf = () => {
+    if (!student) {
+      return;
+    }
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = margin;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("WMSU Class Schedule", margin, y);
+
+    y += 24;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Student: ${student.name}`, margin, y);
+    y += 16;
+    doc.text(`Student ID: ${student.id}`, margin, y);
+    y += 16;
+    doc.text(`Course: ${student.course}${student.year ? ` - Year ${student.year}` : ""}${student.section ? ` Section ${student.section}` : ""}`, margin, y);
+    y += 22;
+
+    WEEK_DAYS.forEach((day) => {
+      const entries = weeklySchedule[day] || [];
+
+      if (y > pageHeight - 90) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(day, margin, y);
+      y += 14;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+
+      if (entries.length === 0) {
+        doc.text("No classes", margin + 12, y);
+        y += 14;
+      } else {
+        entries.forEach((item) => {
+          const line = `${item.timeRange}  |  ${item.code} - ${item.title} (Teacher: ${item.teacherName})`;
+          const wrapped = doc.splitTextToSize(line, pageWidth - margin * 2 - 12);
+          doc.text(wrapped, margin + 12, y);
+          y += wrapped.length * 12;
+        });
+      }
+
+      y += 8;
+    });
+
+    doc.save(`WMSU-Schedule-${student.id}.pdf`);
+  };
+
   if (!student) {
     return (
       <div className="min-h-[60vh] bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center p-4">
@@ -103,6 +336,18 @@ const StudentProfilePage = ({ currentUser }) => {
           </div>
         </div>
 
+        {notice.text && (
+          <div
+            className={`mb-4 rounded-xl px-4 py-3 text-sm font-semibold ${
+              notice.type === "success"
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}
+          >
+            {notice.text}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-[1fr_320px] gap-5">
           {/* Left Section */}
           <div className="space-y-5">
@@ -116,8 +361,18 @@ const StudentProfilePage = ({ currentUser }) => {
               </div>
               <div className="p-5">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                  <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                    <User size={22} className="text-red-600" />
+                  <div className="relative">
+                    {student.profileImage ? (
+                      <img
+                        src={student.profileImage}
+                        alt="Student profile"
+                        className="w-20 h-20 rounded-2xl object-cover border border-red-200"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center">
+                        <User size={30} className="text-red-600" />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-gray-900">{student.name}</h4>
@@ -135,6 +390,21 @@ const StudentProfilePage = ({ currentUser }) => {
                         <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
                           Sec {student.section}
                         </span>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700">
+                        <ImagePlus size={14} />
+                        Add Picture
+                        <input type="file" accept="image/*" className="hidden" onChange={handleProfileImageChange} />
+                      </label>
+                      {student.profileImage && (
+                        <button
+                          onClick={removeProfileImage}
+                          className="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-300"
+                        >
+                          <Trash2 size={14} /> Remove
+                        </button>
                       )}
                     </div>
                   </div>
@@ -187,6 +457,78 @@ const StudentProfilePage = ({ currentUser }) => {
               <p className="text-[10px] text-gray-400 mt-2">
                 {attended} of {myLogs.length} sessions attended
               </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+              <div className="px-5 py-3 bg-red-50 border-b border-red-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <BookOpen size={16} className="text-red-600" />
+                    <h3 className="font-semibold text-gray-900">Enrolled Subjects</h3>
+                  </div>
+                  <span className="text-[10px] text-gray-500 bg-white px-2 py-0.5 rounded-full">
+                    {enrolledSubjects.length} enrolled
+                  </span>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {enrolledSubjects.length === 0 ? (
+                  <div className="text-center py-8">
+                    <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-400">No enrolled subjects yet</p>
+                  </div>
+                ) : (
+                  enrolledSubjects.map((subject) => (
+                    <div key={subject.id} className="px-5 py-3 hover:bg-gray-50 transition-all">
+                      <p className="font-semibold text-sm text-gray-900">
+                        {subject.code} - {subject.title}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{subject.schedule || "Schedule not set"}</p>
+                      <p className="text-xs text-gray-400 mt-1">Teacher: {subject.teacherName || "Unassigned"}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+              <div className="px-5 py-3 bg-red-50 border-b border-red-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CalendarCheck2 size={16} className="text-red-600" />
+                    <h3 className="font-semibold text-gray-900">Weekly Class Schedule</h3>
+                  </div>
+                  <button
+                    onClick={downloadSchedulePdf}
+                    className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+                  >
+                    <FileDown size={13} /> PDF
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                {WEEK_DAYS.map((day) => {
+                  const entries = weeklySchedule[day] || [];
+                  return (
+                    <div key={day} className="rounded-lg border border-gray-200 p-3 bg-gray-50">
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-600">{day}</p>
+                      {entries.length === 0 ? (
+                        <p className="text-xs text-gray-400 mt-2">No classes</p>
+                      ) : (
+                        <div className="mt-2 space-y-2">
+                          {entries.map((item, index) => (
+                            <div key={`${item.code}-${index}`} className="rounded-md bg-white border border-red-100 px-2 py-1.5">
+                              <p className="text-xs font-bold text-red-700">{item.code}</p>
+                              <p className="text-xs text-gray-700 line-clamp-1">{item.title}</p>
+                              <p className="text-[11px] text-gray-500 mt-1">{item.timeRange}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
