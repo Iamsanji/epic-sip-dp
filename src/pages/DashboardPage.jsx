@@ -21,7 +21,7 @@ import {
   getSubjects,
 } from '../utils/localStorageUtils';
 
-const DashboardPage = () => {
+const DashboardPage = ({ currentUser }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,33 +47,111 @@ const DashboardPage = () => {
       const attendanceLogs = getAttendanceLogs();
       const subjects = getSubjects();
       const sessions = getAttendanceSessions();
+      const isTeacher = currentUser?.role === 'teacher';
+      const currentTeacherId = String(currentUser?.id || '').trim();
+
+      const visibleSubjects = isTeacher
+        ? subjects.filter((subject) => String(subject.teacherId || '').trim() === currentTeacherId)
+        : subjects;
+
+      const visibleSubjectIds = new Set(
+        visibleSubjects.map((subject) => String(subject.id || '').trim()).filter(Boolean)
+      );
+
+      const visibleSessions = isTeacher
+        ? sessions.filter((session) => String(session.teacherId || '').trim() === currentTeacherId)
+        : sessions;
+
+      const visibleLogs = isTeacher
+        ? attendanceLogs.filter((log) => visibleSubjectIds.has(String(log.subjectId || '').trim()))
+        : attendanceLogs;
+
+      const visibleStudentIds = new Set(
+        visibleSubjects.flatMap((subject) =>
+          Array.isArray(subject.studentIds)
+            ? subject.studentIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : []
+        )
+      );
+
+      const visibleStudents = isTeacher
+        ? savedStudents.filter((student) => visibleStudentIds.has(String(student.id || '').trim()))
+        : savedStudents;
 
       const todayISO = getLocalDateISO();
-      const logsToday = attendanceLogs.filter((log) => log.dateISO === todayISO);
+      const logsToday = visibleLogs.filter((log) => log.dateISO === todayISO);
 
       const todayByStudent = new Map();
       logsToday.forEach((log) => {
-        todayByStudent.set(log.studentId, log);
+        const studentId = String(log.studentId || '').trim();
+        if (!studentId) {
+          return;
+        }
+
+        if (isTeacher && !visibleStudentIds.has(studentId)) {
+          return;
+        }
+
+        todayByStudent.set(studentId, log);
       });
 
       const present = [...todayByStudent.values()].filter((log) => log.status === 'present').length;
       const late = [...todayByStudent.values()].filter((log) => log.status === 'late').length;
-      const absent = savedStudents.length - todayByStudent.size;
+      const absent = visibleStudents.length - todayByStudent.size;
 
-      setStats(prev => [
-        { ...prev[0], value: savedStudents.length },
-        { ...prev[1], value: present },
-        { ...prev[2], value: late },
-        { ...prev[3], value: Math.max(0, absent) },
-        { ...prev[4], value: attendanceLogs.length },
+      setStats([
+        {
+          label: isTeacher ? 'My Students' : 'Total Students',
+          value: visibleStudents.length,
+          change: '+0',
+          changeType: 'up',
+          icon: Users,
+          color: 'from-red-600 to-red-700',
+        },
+        {
+          label: 'Present Today',
+          value: present,
+          change: '+0',
+          changeType: 'up',
+          icon: CalendarCheck,
+          color: 'from-red-500 to-red-600',
+        },
+        {
+          label: 'Late Today',
+          value: late,
+          change: '+0',
+          changeType: 'down',
+          icon: Clock,
+          color: 'from-red-400 to-red-500',
+        },
+        {
+          label: 'Absent Today',
+          value: Math.max(0, absent),
+          change: '+0',
+          changeType: 'up',
+          icon: UserX,
+          color: 'from-red-700 to-red-800',
+        },
+        {
+          label: isTeacher ? 'My Logs' : 'Total Logs',
+          value: visibleLogs.length,
+          change: '+0',
+          changeType: 'up',
+          icon: FileText,
+          color: 'from-red-600 to-red-700',
+        },
       ]);
 
-      setRecentActivity(attendanceLogs.slice(0, 8));
-      setOpenSessions(sessions.filter((session) => session.status === 'OPEN'));
+      setRecentActivity(visibleLogs.slice(0, 8));
+      setOpenSessions(visibleSessions.filter((session) => session.status === 'OPEN'));
 
-      const overview = subjects.map((subject) => {
-        const enrolled = subject.studentIds?.length || 0;
-        const openSession = sessions.find((session) => session.subjectId === subject.id && session.status === 'OPEN');
+      const overview = visibleSubjects.map((subject) => {
+        const enrolled = isTeacher
+          ? (subject.studentIds || []).filter((id) => visibleStudentIds.has(String(id || '').trim())).length
+          : subject.studentIds?.length || 0;
+        const openSession = visibleSessions.find(
+          (session) => session.subjectId === subject.id && session.status === 'OPEN'
+        );
         return {
           id: subject.id,
           code: subject.code,
@@ -86,7 +164,7 @@ const DashboardPage = () => {
       setSubjectOverview(overview.slice(0, 6));
 
       const summaryMap = new Map();
-      attendanceLogs.forEach((log) => {
+      visibleLogs.forEach((log) => {
         const key = log.subjectCode || 'GENERAL';
         const current = summaryMap.get(key) || { subjectCode: key, total: 0, present: 0, late: 0, absent: 0 };
         current.total += 1;
@@ -108,6 +186,8 @@ const DashboardPage = () => {
     }
   };
 
+  const isTeacherView = currentUser?.role === 'teacher';
+
   useEffect(() => {
     fetchDashboardData();
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -124,7 +204,7 @@ const DashboardPage = () => {
       clearInterval(timer);
       window.removeEventListener('attendance:data-changed', onDataChanged);
     };
-  }, []);
+  }, [currentUser]);
 
   const total = stats[0].value || 0;
   const attendancePercentage = total > 0 ? ((stats[1].value / total) * 100).toFixed(1) : 0;
@@ -161,7 +241,7 @@ const DashboardPage = () => {
                   <span className="text-red-600">WMSU</span> Attendance
                 </h1>
                 <p className="text-gray-500 text-sm mt-1">
-                  {greeting}! Here's your attendance summary
+                  {isTeacherView ? `${greeting}! Here's your teaching attendance summary` : `${greeting}! Here's your attendance summary`}
                 </p>
               </div>
             </div>
@@ -210,7 +290,9 @@ const DashboardPage = () => {
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Open Sessions</h3>
-                <p className="text-sm text-gray-500 mt-1">Subjects currently accepting QR scans</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isTeacherView ? 'Your subjects currently accepting QR scans' : 'Subjects currently accepting QR scans'}
+                </p>
               </div>
               <Radio className="text-red-600 w-5 h-5" />
             </div>
@@ -235,7 +317,9 @@ const DashboardPage = () => {
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Subject Overview</h3>
-                <p className="text-sm text-gray-500 mt-1">Enrollment and session status by class</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isTeacherView ? 'Enrollment and session status for your classes' : 'Enrollment and session status by class'}
+                </p>
               </div>
               <Users className="text-red-600 w-5 h-5" />
             </div>
@@ -333,7 +417,9 @@ const DashboardPage = () => {
           <div className="p-6 border-b border-gray-100 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-              <p className="text-sm text-gray-500 mt-1">Latest attendance records</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {isTeacherView ? 'Latest records from your subjects' : 'Latest attendance records'}
+                </p>
             </div>
             <Activity className="text-red-600 w-5 h-5" />
           </div>
@@ -421,7 +507,9 @@ const DashboardPage = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h3 className="text-lg font-bold text-gray-900">Subject Analytics</h3>
-            <p className="text-sm text-gray-500 mt-1">Performance breakdown by subject</p>
+            <p className="text-sm text-gray-500 mt-1">
+              {isTeacherView ? 'Performance breakdown for your subjects' : 'Performance breakdown by subject'}
+            </p>
           </div>
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">

@@ -27,6 +27,71 @@ const safeParse = (value, fallback) => {
 
 const pad = (value) => String(value).padStart(2, '0');
 
+const WEEK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_ALIASES = {
+  mon: 'Monday',
+  monday: 'Monday',
+  tue: 'Tuesday',
+  tues: 'Tuesday',
+  tuesday: 'Tuesday',
+  wed: 'Wednesday',
+  wednesday: 'Wednesday',
+  thu: 'Thursday',
+  thur: 'Thursday',
+  thurs: 'Thursday',
+  thursday: 'Thursday',
+  fri: 'Friday',
+  friday: 'Friday',
+  sat: 'Saturday',
+  saturday: 'Saturday',
+  sun: 'Sunday',
+  sunday: 'Sunday',
+};
+
+const COMPACT_DAY_CODES = {
+  m: 'Monday',
+  t: 'Tuesday',
+  w: 'Wednesday',
+  th: 'Thursday',
+  f: 'Friday',
+  s: 'Saturday',
+  su: 'Sunday',
+};
+
+const parseCompactDayToken = (token) => {
+  const value = String(token || '').trim().toLowerCase();
+  if (!value || !/^[a-z]+$/.test(value)) {
+    return [];
+  }
+
+  const parsedDays = [];
+  let index = 0;
+
+  while (index < value.length) {
+    if (value.startsWith('th', index)) {
+      parsedDays.push(COMPACT_DAY_CODES.th);
+      index += 2;
+      continue;
+    }
+
+    if (value.startsWith('su', index)) {
+      parsedDays.push(COMPACT_DAY_CODES.su);
+      index += 2;
+      continue;
+    }
+
+    const single = value[index];
+    if (!COMPACT_DAY_CODES[single]) {
+      return [];
+    }
+
+    parsedDays.push(COMPACT_DAY_CODES[single]);
+    index += 1;
+  }
+
+  return parsedDays;
+};
+
 const formatMinutesToClock = (minutes, baseDate = new Date()) => {
   const totalMinutes = Number(minutes);
   if (!Number.isFinite(totalMinutes)) {
@@ -68,42 +133,164 @@ const parseHourMinute = (hourText, minuteText, meridiem) => {
   return hour * 60 + minute;
 };
 
-export const parseScheduleDurationMinutes = (scheduleText) => {
+const SCHEDULE_TIME_RANGE_REGEX =
+  /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
+
+const parseScheduleTimeRangeMinutes = (scheduleText) => {
   const schedule = String(scheduleText || '').trim();
   if (!schedule) {
     return null;
   }
 
-  const timeRangeMatch = schedule.match(
-    /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i
-  );
-
+  const timeRangeMatch = schedule.match(SCHEDULE_TIME_RANGE_REGEX);
   if (!timeRangeMatch) {
     return null;
   }
 
   const [, startHourText, startMinuteText, rawStartMeridiem, endHourText, endMinuteText, rawEndMeridiem] =
     timeRangeMatch;
-  const startMeridiem = (rawStartMeridiem || rawEndMeridiem || '').toLowerCase() || null;
-  const endMeridiem = (rawEndMeridiem || rawStartMeridiem || '').toLowerCase() || null;
 
-  const startMinutes = parseHourMinute(startHourText, startMinuteText, startMeridiem);
-  const endMinutesBase = parseHourMinute(endHourText, endMinuteText, endMeridiem);
+  const startMeridiem = String(rawStartMeridiem || '').toLowerCase() || null;
+  const endMeridiem = String(rawEndMeridiem || '').toLowerCase() || null;
 
-  if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutesBase)) {
+  const startCandidates = startMeridiem ? [startMeridiem] : [null, 'am', 'pm'];
+  const endCandidates = endMeridiem ? [endMeridiem] : [null, 'am', 'pm'];
+  const validRanges = [];
+
+  startCandidates.forEach((startCandidate) => {
+    endCandidates.forEach((endCandidate) => {
+      let parsedStart = parseHourMinute(startHourText, startMinuteText, startCandidate);
+      let parsedEnd = parseHourMinute(endHourText, endMinuteText, endCandidate);
+
+      if (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd)) {
+        return;
+      }
+
+      // Handle shorthand like 10:00 - 1:00 by interpreting end as afternoon continuation.
+      if (!startCandidate && !endCandidate && parsedEnd <= parsedStart) {
+        parsedEnd += 12 * 60;
+      }
+
+      let durationMinutes = parsedEnd - parsedStart;
+      if (durationMinutes <= 0) {
+        durationMinutes += 24 * 60;
+      }
+
+      if (durationMinutes <= 0 || durationMinutes > 12 * 60) {
+        return;
+      }
+
+      validRanges.push({
+        startMinutes: parsedStart,
+        endMinutes: parsedEnd,
+        durationMinutes,
+      });
+    });
+  });
+
+  if (validRanges.length === 0) {
     return null;
   }
 
-  let duration = endMinutesBase - startMinutes;
-  if (duration <= 0) {
-    duration += 24 * 60;
+  return validRanges.sort((a, b) => a.durationMinutes - b.durationMinutes)[0];
+};
+
+export const parseScheduleDays = (scheduleText) => {
+  const text = String(scheduleText || '').trim().toLowerCase();
+  if (!text) {
+    return [];
   }
 
-  if (duration <= 0 || duration > 12 * 60) {
+  const days = new Set();
+  const tokens = text.match(/[a-z]+/g) || [];
+
+  tokens.forEach((token) => {
+    if (token === 'm') {
+      days.add('Monday');
+      return;
+    }
+
+    if (token === 't') {
+      days.add('Tuesday');
+      return;
+    }
+
+    if (token === 'w') {
+      days.add('Wednesday');
+      return;
+    }
+
+    if (token === 'h') {
+      days.add('Thursday');
+      return;
+    }
+
+    if (token === 'f') {
+      days.add('Friday');
+      return;
+    }
+
+    if (token === 's') {
+      days.add('Saturday');
+      return;
+    }
+
+    if (token === 'su') {
+      days.add('Sunday');
+      return;
+    }
+
+    if (token === 'mwf') {
+      days.add('Monday');
+      days.add('Wednesday');
+      days.add('Friday');
+      return;
+    }
+
+    if (token === 'tth') {
+      days.add('Tuesday');
+      days.add('Thursday');
+      return;
+    }
+
+    if (token === 'th') {
+      days.add('Thursday');
+      return;
+    }
+
+    const mappedDay = DAY_ALIASES[token];
+    if (mappedDay) {
+      days.add(mappedDay);
+      return;
+    }
+
+    // Supports compact combinations like MTWTHF.
+    const compactDays = parseCompactDayToken(token);
+    compactDays.forEach((day) => days.add(day));
+    if (compactDays.length > 0) {
+      return;
+    }
+  });
+
+  return WEEK_DAYS.filter((day) => days.has(day));
+};
+
+export const parseScheduleTimeRange = (scheduleText) => {
+  const parsed = parseScheduleTimeRangeMinutes(scheduleText);
+  if (!parsed) {
     return null;
   }
 
-  return duration;
+  return {
+    startMinutes: parsed.startMinutes,
+    endMinutes: parsed.endMinutes,
+    durationMinutes: parsed.durationMinutes,
+  };
+};
+
+export const parseScheduleDurationMinutes = (scheduleText) => {
+  const parsed = parseScheduleTimeRangeMinutes(scheduleText);
+  return parsed ? parsed.durationMinutes : null;
 };
 
 export const getSubjectSessionTimingRules = (scheduleText, preferredLateGraceMinutes = 15) => {
@@ -824,9 +1011,14 @@ export const getActiveSessionForSubject = (subjectId) => {
 export const startAttendanceSession = ({ subject, teacher, timing }) => {
   const sessions = getAttendanceSessions();
   const safeSubjectId = String(subject?.id || '').trim();
+  const actorRole = String(teacher?.role || '').toLowerCase();
 
   if (!safeSubjectId) {
     throw new Error('Subject is required to start a session.');
+  }
+
+  if (actorRole !== 'teacher') {
+    throw new Error('Only teachers can start attendance sessions.');
   }
 
   const assignedTeacherId = String(subject?.teacherId || '').trim();
@@ -834,18 +1026,29 @@ export const startAttendanceSession = ({ subject, teacher, timing }) => {
     throw new Error('This subject has no assigned teacher. Assign one before starting a session.');
   }
 
-  if (String(teacher?.role || '').toLowerCase() === 'teacher' && String(teacher?.id || '').trim() !== assignedTeacherId) {
+  if (String(teacher?.id || '').trim() !== assignedTeacherId) {
     throw new Error('You can only start sessions for subjects assigned to your account.');
+  }
+
+  const scheduleDays = parseScheduleDays(subject?.schedule);
+  const now = new Date();
+  const todayName = WEEK_DAYS[now.getDay()];
+
+  if (scheduleDays.length === 0) {
+    throw new Error('Subject schedule must include day(s) like MWF, Mon Wed Fri, or Monday Wednesday Friday.');
+  }
+
+  if (!scheduleDays.includes(todayName)) {
+    throw new Error(`Cannot start this session today. Scheduled day(s): ${scheduleDays.join(', ')}. Today is ${todayName}.`);
   }
 
   const lateGraceMinutes = Number.isFinite(Number(timing?.lateGraceMinutes))
     ? Math.max(0, Math.min(180, Number(timing.lateGraceMinutes)))
     : 15;
   const closeAfterMinutes = Number.isFinite(Number(timing?.closeAfterMinutes))
-    ? Math.max(lateGraceMinutes, Math.min(360, Number(timing.closeAfterMinutes)))
+    ? Math.max(lateGraceMinutes, Math.min(720, Number(timing.closeAfterMinutes)))
     : Math.max(lateGraceMinutes, 30);
 
-  const now = new Date();
   const startMinutes = now.getHours() * 60 + now.getMinutes();
   const lateCutoffMinutes = startMinutes + lateGraceMinutes;
   const closeMinutes = startMinutes + closeAfterMinutes;

@@ -56,10 +56,11 @@ const SessionsPage = ({ currentUser }) => {
     () => visibleSessions.filter((session) => session.status === "OPEN"),
     [visibleSessions]
   );
+  const canStartSessions = currentUser?.role === "teacher";
 
   const startSubjectSession = (subject) => {
     const safeLateGrace = Math.max(0, Math.min(180, Number(lateGraceMinutes) || 0));
-    const safeCloseAfter = Math.max(safeLateGrace, Math.min(360, Number(closeAfterMinutes) || 0));
+    const safeCloseAfter = Math.max(safeLateGrace, Math.min(720, Number(closeAfterMinutes) || 0));
 
     setIsLoading(true);
     try {
@@ -203,7 +204,7 @@ const SessionsPage = ({ currentUser }) => {
             <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4">
               <p className="text-sm font-bold text-red-700">Session Timing Rules</p>
               <p className="text-xs text-red-600 mt-1">
-                Attendance starts when the teacher clicks Start. Session closes automatically based on the session time you set below.
+                Only teachers can start sessions for their assigned subjects. Session closes automatically based on the session time you set below.
               </p>
               <div className="mt-3 grid sm:grid-cols-2 gap-3">
                 <label className="text-xs font-semibold text-gray-600">
@@ -222,7 +223,7 @@ const SessionsPage = ({ currentUser }) => {
                   <input
                     type="number"
                     min={0}
-                    max={360}
+                    max={720}
                     value={closeAfterMinutes}
                     onChange={(event) => setCloseAfterMinutes(event.target.value)}
                     className="mt-1 w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-gray-900"
@@ -230,7 +231,7 @@ const SessionsPage = ({ currentUser }) => {
                 </label>
               </div>
               <p className="mt-2 text-[11px] text-gray-500">
-                Example: if Close after is 15 minutes, the session auto-closes 15 minutes after Start.
+                Example: if Close after is 180 minutes, the session auto-closes 3 hours after Start.
               </p>
             </div>
 
@@ -295,9 +296,9 @@ const SessionsPage = ({ currentUser }) => {
                         <div className="flex flex-col sm:flex-row gap-2 mt-4">
                           <button
                             onClick={() => startSubjectSession(subject)}
-                            disabled={isLoading || activeSession || !hasAssignedTeacher}
+                            disabled={isLoading || activeSession || !hasAssignedTeacher || !canStartSessions}
                             className={`flex-1 px-3 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                              activeSession || !hasAssignedTeacher
+                              activeSession || !hasAssignedTeacher || !canStartSessions
                                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                                 : "bg-red-600 hover:bg-red-700 text-white transform hover:scale-[1.02]"
                             }`}
@@ -320,6 +321,12 @@ const SessionsPage = ({ currentUser }) => {
                         {!hasAssignedTeacher && (
                           <div className="mt-2 rounded-lg border border-yellow-200 bg-yellow-50 px-2 py-1.5 text-[11px] text-yellow-700">
                             No teacher assigned. Assign a teacher from Admin Controls before starting this session.
+                          </div>
+                        )}
+
+                        {!canStartSessions && (
+                          <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[11px] text-blue-700">
+                            Teacher login required to start sessions. Admin can monitor and close existing sessions.
                           </div>
                         )}
 

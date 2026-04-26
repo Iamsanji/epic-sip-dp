@@ -10,7 +10,7 @@ import {
   upsertTodayAttendanceLog,
 } from "../utils/localStorageUtils";
 
-const ScannerPage = () => {
+const ScannerPage = ({ currentUser }) => {
   const [scannerStarted, setScannerStarted] = useState(false);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("");
@@ -20,9 +20,33 @@ const ScannerPage = () => {
   const scannerRef = useRef(null);
   const isProcessingRef = useRef(false);
 
+  const filterSessionsForUser = (sessions) => {
+    const role = String(currentUser?.role || "").toLowerCase();
+    const currentUserId = String(currentUser?.id || "").trim();
+
+    if (role === "teacher") {
+      return sessions.filter((session) => String(session.teacherId || "").trim() === currentUserId);
+    }
+
+    return sessions;
+  };
+
+  const canUserScanSession = (session) => {
+    if (!session) {
+      return false;
+    }
+
+    const role = String(currentUser?.role || "").toLowerCase();
+    if (role !== "teacher") {
+      return true;
+    }
+
+    return String(session.teacherId || "").trim() === String(currentUser?.id || "").trim();
+  };
+
   useEffect(() => {
     const syncSessions = () => {
-      const sessions = getOpenAttendanceSessions();
+      const sessions = filterSessionsForUser(getOpenAttendanceSessions());
       setOpenSessions(sessions);
       setSelectedSessionId((prev) => {
         if (prev && sessions.some((session) => session.id === prev)) {
@@ -36,7 +60,7 @@ const ScannerPage = () => {
     syncSessions();
     window.addEventListener("attendance:data-changed", syncSessions);
     return () => window.removeEventListener("attendance:data-changed", syncSessions);
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     if (scannerStarted) {
@@ -45,9 +69,13 @@ const ScannerPage = () => {
 
     if (openSessions.length === 0) {
       setStatus("error");
-      setMessage("No open attendance sessions found. Ask an admin or assigned teacher to open one first.");
+      if (String(currentUser?.role || "").toLowerCase() === "teacher") {
+        setMessage("No open attendance sessions assigned to your subjects.");
+      } else {
+        setMessage("No open attendance sessions found. Ask an admin or assigned teacher to open one first.");
+      }
     }
-  }, [openSessions, scannerStarted]);
+  }, [openSessions, scannerStarted, currentUser]);
 
   const getAttendanceStatusForSession = (session, date = new Date()) => {
     const totalMinutes = date.getHours() * 60 + date.getMinutes();
@@ -118,6 +146,12 @@ const ScannerPage = () => {
       return;
     }
 
+    if (!canUserScanSession(selectedSession)) {
+      setStatus("error");
+      setMessage("You can only scan sessions for subjects assigned to your teacher account.");
+      return;
+    }
+
     const scanner = new Html5QrcodeScanner(
       "reader",
       {
@@ -154,6 +188,12 @@ const ScannerPage = () => {
           if (!liveSession) {
             setStatus("error");
             setMessage("Session was closed before scan completed.");
+            return;
+          }
+
+          if (!canUserScanSession(liveSession)) {
+            setStatus("error");
+            setMessage("You are not authorized to scan for this session.");
             return;
           }
 

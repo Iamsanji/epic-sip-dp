@@ -3,7 +3,9 @@ import { BookOpen, Trash2, PlusCircle, Users, User, Calendar, Clock, Search, X, 
 import {
   deleteSubject,
   getStudents,
+  parseScheduleDays,
   parseScheduleDurationMinutes,
+  parseScheduleTimeRange,
   getSubjects,
   getUsers,
   saveSubjects,
@@ -88,6 +90,65 @@ const SubjectsPage = ({ currentUser }) => {
     }
   };
 
+  const findStudentScheduleConflict = ({
+    targetSchedule,
+    targetStudentIds,
+    excludeSubjectId = "",
+  }) => {
+    const targetDays = parseScheduleDays(targetSchedule);
+    const targetTimeRange = parseScheduleTimeRange(targetSchedule);
+    const targetStudents = new Set((targetStudentIds || []).map((id) => String(id || "").trim()).filter(Boolean));
+
+    if (targetDays.length === 0 || !targetTimeRange || targetStudents.size === 0) {
+      return null;
+    }
+
+    for (const subject of subjects) {
+      if (excludeSubjectId && subject.id === excludeSubjectId) {
+        continue;
+      }
+
+      const existingStudentIds = Array.isArray(subject.studentIds)
+        ? subject.studentIds.map((id) => String(id || "").trim()).filter(Boolean)
+        : [];
+      if (existingStudentIds.length === 0) {
+        continue;
+      }
+
+      const sharedStudentId = existingStudentIds.find((id) => targetStudents.has(id));
+      if (!sharedStudentId) {
+        continue;
+      }
+
+      const existingDays = parseScheduleDays(subject.schedule);
+      const hasSharedDay = existingDays.some((day) => targetDays.includes(day));
+      if (!hasSharedDay) {
+        continue;
+      }
+
+      const existingTimeRange = parseScheduleTimeRange(subject.schedule);
+      if (!existingTimeRange) {
+        continue;
+      }
+
+      const hasOverlap =
+        targetTimeRange.startMinutes < existingTimeRange.endMinutes &&
+        existingTimeRange.startMinutes < targetTimeRange.endMinutes;
+
+      if (!hasOverlap) {
+        continue;
+      }
+
+      const sharedStudent = students.find((student) => String(student.id || "").trim() === sharedStudentId);
+      return {
+        subject,
+        sharedStudent,
+      };
+    }
+
+    return null;
+  };
+
   const createSubject = (e) => {
     e.preventDefault();
 
@@ -100,6 +161,8 @@ const SubjectsPage = ({ currentUser }) => {
     const title = form.title.trim();
     const schedule = form.schedule.trim();
     const teacher = teachers.find((item) => item.id === form.teacherId);
+    const scheduleDays = parseScheduleDays(schedule);
+    const scheduleTimeRange = parseScheduleTimeRange(schedule);
     const scheduleDurationMinutes = parseScheduleDurationMinutes(schedule);
 
     if (!code || !title || !teacher || !schedule) {
@@ -107,9 +170,42 @@ const SubjectsPage = ({ currentUser }) => {
       return;
     }
 
+    if (scheduleDays.length === 0) {
+      setMessage({
+        text: "❌ Schedule must include at least one day (example: MWF, Mon Wed Fri, or Monday Wednesday Friday).",
+        type: "error",
+      });
+      return;
+    }
+
     if (!Number.isFinite(scheduleDurationMinutes) || scheduleDurationMinutes <= 0) {
       setMessage({
         text: "❌ Schedule must include a valid time range (example: Monday 7:00 - 10:00).",
+        type: "error",
+      });
+      return;
+    }
+
+    if (
+      !scheduleTimeRange ||
+      scheduleTimeRange.startMinutes < 7 * 60 ||
+      scheduleTimeRange.endMinutes > 19 * 60
+    ) {
+      setMessage({
+        text: "❌ Class time must stay within 7:00 AM to 7:00 PM (example: Mon Wed Fri 10:00 - 1:00).",
+        type: "error",
+      });
+      return;
+    }
+
+    const conflict = findStudentScheduleConflict({
+      targetSchedule: schedule,
+      targetStudentIds: form.studentIds,
+    });
+
+    if (conflict?.subject) {
+      setMessage({
+        text: `❌ Student schedule conflict. ${conflict.sharedStudent?.name || "A student"} overlaps with ${conflict.subject.code} (${conflict.subject.schedule}).`,
         type: "error",
       });
       return;
@@ -199,8 +295,23 @@ const SubjectsPage = ({ currentUser }) => {
       return;
     }
 
+    const normalizedStudentIds = [...new Set(editingStudentIds.map((id) => String(id || "").trim()).filter(Boolean))];
+    const conflict = findStudentScheduleConflict({
+      targetSchedule: subject.schedule,
+      targetStudentIds: normalizedStudentIds,
+      excludeSubjectId: subject.id,
+    });
+
+    if (conflict?.subject) {
+      setMessage({
+        text: `❌ Cannot enroll due to schedule conflict. ${conflict.sharedStudent?.name || "A student"} already has ${conflict.subject.code} (${conflict.subject.schedule}).`,
+        type: "error",
+      });
+      return;
+    }
+
     const nextSubjects = subjects.map((item) =>
-      item.id === subjectId ? { ...item, studentIds: [...new Set(editingStudentIds)] } : item
+      item.id === subjectId ? { ...item, studentIds: normalizedStudentIds } : item
     );
 
     saveSubjects(nextSubjects);
@@ -395,12 +506,12 @@ const SubjectsPage = ({ currentUser }) => {
                     <input
                       value={form.schedule}
                       onChange={(e) => setForm((prev) => ({ ...prev, schedule: e.target.value }))}
-                      placeholder="e.g., Monday 7:00 - 10:00"
+                      placeholder="e.g., MWF 10:00 - 1:00"
                       required
                       className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      This time range is used to auto-close attendance sessions.
+                      Accepts day shortcuts (MWF, MTWTHF, Mon Wed Fri, Monday Wednesday Friday). Time must be within 7:00 AM to 7:00 PM.
                     </p>
                   </div>
                 </div>

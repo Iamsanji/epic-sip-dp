@@ -80,7 +80,7 @@ const MainLayout = () => {
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <DashboardPage />;
+        return <DashboardPage currentUser={currentUser} />;
       case 'subjects':
         return <SubjectsPage currentUser={currentUser} />;
       case 'sessions':
@@ -88,7 +88,7 @@ const MainLayout = () => {
       case 'admin-controls':
         return <AdminControlsPage currentUser={currentUser} />;
       case 'scanner':
-        return <ScannerPage />;
+        return <ScannerPage currentUser={currentUser} />;
       case 'register':
         return <RegisterStudentPage currentUser={currentUser} />;
       case 'students':
@@ -98,7 +98,7 @@ const MainLayout = () => {
       case 'profile':
         return <StudentProfilePage currentUser={currentUser} />;
       default:
-        return <DashboardPage />;
+        return <DashboardPage currentUser={currentUser} />;
     }
   };
 

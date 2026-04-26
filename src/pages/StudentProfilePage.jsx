@@ -24,61 +24,13 @@ import {
 } from "lucide-react";
 import {
   getAttendanceLogs,
+  parseScheduleDays,
   getStudentById,
   getSubjects,
   updateStudentProfileImage,
 } from "../utils/localStorageUtils";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-const DAY_KEYWORDS = {
-  monday: "Monday",
-  mon: "Monday",
-  tuesday: "Tuesday",
-  tue: "Tuesday",
-  tues: "Tuesday",
-  wednesday: "Wednesday",
-  wed: "Wednesday",
-  thursday: "Thursday",
-  thu: "Thursday",
-  thur: "Thursday",
-  thurs: "Thursday",
-  friday: "Friday",
-  fri: "Friday",
-  saturday: "Saturday",
-  sat: "Saturday",
-  sunday: "Sunday",
-  sun: "Sunday",
-};
-
-const getDaysFromSchedule = (schedule) => {
-  const text = String(schedule || "").trim().toLowerCase();
-  if (!text) {
-    return [];
-  }
-
-  const days = new Set();
-
-  if (/\bmwf\b/i.test(text)) {
-    days.add("Monday");
-    days.add("Wednesday");
-    days.add("Friday");
-  }
-
-  if (/\btt?h\b/i.test(text) || /\btth\b/i.test(text)) {
-    days.add("Tuesday");
-    days.add("Thursday");
-  }
-
-  Object.entries(DAY_KEYWORDS).forEach(([keyword, day]) => {
-    const pattern = new RegExp(`\\b${keyword}\\b`, "i");
-    if (pattern.test(text)) {
-      days.add(day);
-    }
-  });
-
-  return WEEK_DAYS.filter((day) => days.has(day));
-};
 
 const getTimeRangeFromSchedule = (schedule) => {
   const text = String(schedule || "").trim();
@@ -128,7 +80,7 @@ const StudentProfilePage = ({ currentUser }) => {
     }, {});
 
     enrolledSubjects.forEach((subject) => {
-      const days = getDaysFromSchedule(subject.schedule);
+      const days = parseScheduleDays(subject.schedule);
       const timeRange = getTimeRangeFromSchedule(subject.schedule);
 
       if (days.length === 0) {
