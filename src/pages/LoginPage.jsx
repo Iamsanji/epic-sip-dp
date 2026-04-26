@@ -96,14 +96,7 @@ const LoginPage = ({ onLogin }) => {
         {/* Staff Login */}
         {activeTab === "staff" && (
           <div className="p-6">
-            <div className="mb-4 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
-              <div className="flex items-start gap-2">
-                <Sparkles size={12} className="text-yellow-600 mt-0.5 shrink-0" />
-                <p className="text-xs text-yellow-700">
-                  Demo: <span className="font-mono">admin/admin123</span> or <span className="font-mono">teacher/teacher123</span>
-                </p>
-              </div>
-            </div>
+            
 
             <form onSubmit={handleStaffSubmit} className="space-y-3">
               <input
@@ -133,12 +126,6 @@ const LoginPage = ({ onLogin }) => {
         {/* Student Login */}
         {activeTab === "student" && (
           <div className="p-6">
-            <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-100">
-              <div className="flex items-start gap-2">
-                <QrCode size={12} className="text-blue-600 mt-0.5 shrink-0" />
-                <p className="text-xs text-blue-700">Enter your Student ID or scan QR code</p>
-              </div>
-            </div>
 
             <form onSubmit={handleStudentSubmit} className="space-y-3">
               <input
@@ -158,12 +145,6 @@ const LoginPage = ({ onLogin }) => {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
-          <p className="text-center text-[10px] text-gray-400">
-            © 2024 WMSU Attendance System
-          </p>
-        </div>
       </div>
 
       {/* Toast Message */}
