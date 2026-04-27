@@ -230,14 +230,14 @@ const AttendanceLogsPage = ({ currentUser }) => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      present: { color: 'bg-green-100 text-green-800', icon: UserCheck, label: 'Present' },
-      absent: { color: 'bg-red-100 text-red-800', icon: UserX, label: 'Absent' },
-      late: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Late' }
+      present: { color: 'ui-status-open', icon: UserCheck, label: 'Present' },
+      absent: { color: 'ui-status-closed !text-red-700 !bg-red-100 !border-red-200', icon: UserX, label: 'Absent' },
+      late: { color: 'ui-status-closed !text-yellow-700 !bg-yellow-100 !border-yellow-200', icon: Clock, label: 'Late' }
     };
     const config = statusConfig[status] || statusConfig.present;
     const Icon = config.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${config.color}`}>
+      <span className={`ui-status-badge ${config.color}`}>
         <Icon size={12} />
         {config.label}
       </span>
@@ -291,7 +291,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-green-200 shadow-sm">
+          <div className="ui-card ui-card-pad border-green-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Present</p>
@@ -302,7 +302,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-yellow-200 shadow-sm">
+          <div className="ui-card ui-card-pad border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Late</p>
@@ -313,7 +313,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-200 shadow-sm">
+          <div className="ui-card ui-card-pad border-red-200">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Absent</p>
@@ -327,7 +327,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
         </div>
 
         <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Per-Student Attendance</p>
@@ -342,7 +342,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
                 Object.entries(studentRates)
                   .slice(0, 5)
                   .map(([studentId, rate]) => (
-                    <div key={studentId} className="flex items-center justify-between text-sm">
+                    <div key={studentId} className="ui-meta-row text-sm !items-center !justify-between">
                       <span className="font-mono text-gray-500">{studentId}</span>
                       <span className="font-bold text-red-600">{rate}%</span>
                     </div>
@@ -351,7 +351,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Subject Summary</p>
@@ -366,7 +366,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
                 subjectSummary.map((subject) => {
                   const rate = subject.total > 0 ? (((subject.present + subject.late) / subject.total) * 100).toFixed(1) : '0.0';
                   return (
-                    <div key={subject.subjectCode} className="flex items-center justify-between text-sm">
+                    <div key={subject.subjectCode} className="ui-meta-row text-sm !items-center !justify-between">
                       <span className="font-semibold text-gray-700">{subject.subjectCode}</span>
                       <span className="font-bold text-red-600">{rate}%</span>
                     </div>
@@ -390,9 +390,9 @@ const AttendanceLogsPage = ({ currentUser }) => {
         )}
 
         {/* Main Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
+        <div className="ui-card shadow-xl overflow-hidden">
           {/* Toolbar */}
-          <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
+          <div className="ui-panel-pad border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
             <div className="flex flex-col xl:flex-row gap-3 sm:gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -534,7 +534,7 @@ const AttendanceLogsPage = ({ currentUser }) => {
           <div className="md:hidden p-4 space-y-3">
             {attendanceData.length > 0 ? (
               attendanceData.map((log) => (
-                <div key={log.id} className="rounded-xl border border-gray-200 p-3 bg-white">
+                <div key={log.id} className="ui-card ui-card-pad">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-semibold text-gray-900 text-sm">{log.studentName}</p>

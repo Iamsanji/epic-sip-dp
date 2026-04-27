@@ -12,6 +12,7 @@ import {
 } from "../utils/localStorageUtils";
 
 const SubjectsPage = ({ currentUser }) => {
+  const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -27,6 +28,11 @@ const SubjectsPage = ({ currentUser }) => {
     teacherId: "",
     schedule: "",
     studentIds: [],
+  });
+  const [scheduleBuilder, setScheduleBuilder] = useState({
+    days: [],
+    startTime: "",
+    endTime: "",
   });
 
   useEffect(() => {
@@ -88,6 +94,39 @@ const SubjectsPage = ({ currentUser }) => {
     } else {
       setForm((prev) => ({ ...prev, studentIds: students.map(s => s.id) }));
     }
+  };
+
+  const toggleScheduleDay = (day) => {
+    setScheduleBuilder((prev) => {
+      const exists = prev.days.includes(day);
+      const nextDays = exists
+        ? prev.days.filter((value) => value !== day)
+        : [...prev.days, day];
+
+      const nextBuilderState = {
+        ...prev,
+        days: nextDays,
+      };
+
+      const builtSchedule = buildScheduleFromBuilder(nextBuilderState);
+      if (builtSchedule) {
+        setForm((currentForm) => ({ ...currentForm, schedule: builtSchedule }));
+      }
+
+      return nextBuilderState;
+    });
+  };
+
+  const buildScheduleFromBuilder = (builderState = scheduleBuilder) => {
+    const safeStart = String(builderState.startTime || "").trim();
+    const safeEnd = String(builderState.endTime || "").trim();
+    const orderedDays = dayOrder.filter((day) => builderState.days.includes(day));
+
+    if (orderedDays.length === 0 || !safeStart || !safeEnd) {
+      return "";
+    }
+
+    return `${orderedDays.join(" ")} ${safeStart} - ${safeEnd}`;
   };
 
   const findStudentScheduleConflict = ({
@@ -159,7 +198,8 @@ const SubjectsPage = ({ currentUser }) => {
 
     const code = form.code.trim().toUpperCase();
     const title = form.title.trim();
-    const schedule = form.schedule.trim();
+    const builtSchedule = buildScheduleFromBuilder();
+    const schedule = (form.schedule.trim() || builtSchedule).trim();
     const teacher = teachers.find((item) => item.id === form.teacherId);
     const scheduleDays = parseScheduleDays(schedule);
     const scheduleTimeRange = parseScheduleTimeRange(schedule);
@@ -186,13 +226,9 @@ const SubjectsPage = ({ currentUser }) => {
       return;
     }
 
-    if (
-      !scheduleTimeRange ||
-      scheduleTimeRange.startMinutes < 7 * 60 ||
-      scheduleTimeRange.endMinutes > 19 * 60
-    ) {
+    if (!scheduleTimeRange) {
       setMessage({
-        text: "❌ Class time must stay within 7:00 AM to 7:00 PM (example: Mon Wed Fri 10:00 - 1:00).",
+        text: "❌ Schedule must include a recognizable time range (example: Mon Wed Fri 10:00 - 1:00 or Tue Thu 13:00 - 14:30).",
         type: "error",
       });
       return;
@@ -230,6 +266,7 @@ const SubjectsPage = ({ currentUser }) => {
 
     saveSubjects([...subjects, next]);
     setForm({ code: "", title: "", teacherId: "", schedule: "", studentIds: [] });
+    setScheduleBuilder({ days: [], startTime: "", endTime: "" });
     setShowForm(false);
     setMessage({ text: "✅ Subject created successfully.", type: "success" });
     window.dispatchEvent(new CustomEvent('attendance:data-changed'));
@@ -344,7 +381,7 @@ const SubjectsPage = ({ currentUser }) => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Total Subjects</p>
@@ -355,7 +392,7 @@ const SubjectsPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Total Teachers</p>
@@ -366,7 +403,7 @@ const SubjectsPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Enrolled Students</p>
@@ -377,7 +414,7 @@ const SubjectsPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Avg. Class Size</p>
@@ -407,8 +444,8 @@ const SubjectsPage = ({ currentUser }) => {
         )}
 
         {/* Action Bar */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden mb-6">
-          <div className="p-6">
+        <div className="ui-card shadow-xl overflow-hidden mb-6">
+          <div className="ui-panel-pad">
             <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
               <div className="flex-1 flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                 <div className="relative flex-1">
@@ -503,15 +540,84 @@ const SubjectsPage = ({ currentUser }) => {
                     <label className="block text-sm font-bold text-gray-700 mb-2">
                       Schedule <span className="text-red-500">*</span>
                     </label>
+                    <div className="mb-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-600">Quick Schedule Builder</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {dayOrder.map((day) => {
+                          const selected = scheduleBuilder.days.includes(day);
+
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => toggleScheduleDay(day)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
+                                selected
+                                  ? "bg-red-600 text-white border-red-600"
+                                  : "bg-white text-gray-600 border-gray-200 hover:border-red-300"
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <input
+                          type="time"
+                          value={scheduleBuilder.startTime}
+                          onChange={(e) => {
+                            const nextStartTime = e.target.value;
+                            setScheduleBuilder((prev) => {
+                              const nextBuilderState = {
+                                ...prev,
+                                startTime: nextStartTime,
+                              };
+
+                              const builtSchedule = buildScheduleFromBuilder(nextBuilderState);
+                              if (builtSchedule) {
+                                setForm((currentForm) => ({ ...currentForm, schedule: builtSchedule }));
+                              }
+
+                              return nextBuilderState;
+                            });
+                          }}
+                          className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-sm"
+                        />
+                        <input
+                          type="time"
+                          value={scheduleBuilder.endTime}
+                          onChange={(e) => {
+                            const nextEndTime = e.target.value;
+                            setScheduleBuilder((prev) => {
+                              const nextBuilderState = {
+                                ...prev,
+                                endTime: nextEndTime,
+                              };
+
+                              const builtSchedule = buildScheduleFromBuilder(nextBuilderState);
+                              if (builtSchedule) {
+                                setForm((currentForm) => ({ ...currentForm, schedule: builtSchedule }));
+                              }
+
+                              return nextBuilderState;
+                            });
+                          }}
+                          className="w-full rounded-lg border border-gray-200 px-2.5 py-2 text-sm"
+                        />
+                      </div>
+                      <p className="mt-2 text-[11px] text-gray-500">
+                        Schedule field auto-fills as you pick days and times.
+                      </p>
+                    </div>
                     <input
                       value={form.schedule}
                       onChange={(e) => setForm((prev) => ({ ...prev, schedule: e.target.value }))}
-                      placeholder="e.g., MWF 10:00 - 1:00"
-                      required
+                      placeholder="e.g., Mon Wed Fri 10:00 - 13:00"
                       className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      Accepts day shortcuts (MWF, MTWTHF, Mon Wed Fri, Monday Wednesday Friday). Time must be within 7:00 AM to 7:00 PM.
+                      Accepts day shortcuts (MWF, MTWTHF, Mon Wed Fri, Monday Wednesday Friday) and 24-hour or AM/PM times.
                     </p>
                   </div>
                 </div>
@@ -578,7 +684,7 @@ const SubjectsPage = ({ currentUser }) => {
         </div>
 
         {/* Subjects List */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
+        <div className="ui-card shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
             <div className="flex items-center gap-2">
               <BookOpen className="text-white" size={20} />
@@ -589,7 +695,7 @@ const SubjectsPage = ({ currentUser }) => {
             </div>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="ui-panel-pad">
             {visibleSubjects.length === 0 ? (
               <div className="text-center py-12">
                 <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-3" />
@@ -601,42 +707,85 @@ const SubjectsPage = ({ currentUser }) => {
                 </p>
               </div>
             ) : (
-              visibleSubjects.map((subject) => (
-                <div key={subject.id} className="p-5 hover:bg-red-50/30 transition-all duration-200">
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <h4 className="font-black text-gray-900 text-lg">{subject.code}</h4>
-                        <span className="text-gray-400">•</span>
-                        <p className="text-gray-600 font-medium">{subject.title}</p>
-                        {subject.schedule && (
-                          <>
-                            <span className="text-gray-400">•</span>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Calendar size={12} />
-                              <span>{subject.schedule}</span>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
+                {visibleSubjects.map((subject) => (
+                  <div
+                    key={subject.id}
+                    className="h-full rounded-2xl border-2 border-gray-100 bg-white hover:border-red-200 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="ui-card-pad h-full flex flex-col">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <BookOpen size={14} className="text-gray-400" />
+                            <p className="font-black text-gray-900 text-lg leading-none">{subject.code}</p>
+                          </div>
+                          <p className="text-sm text-gray-700 mt-1.5 leading-snug break-words line-clamp-2">{subject.title}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span className="text-xs text-blue-700 flex items-center gap-1 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                              <User size={10} />
+                              {subject.teacherName || "Unassigned"}
+                            </span>
+                            <span className="text-xs text-green-700 flex items-center gap-1 bg-green-50 border border-green-100 rounded-full px-2 py-0.5">
+                              <Users size={10} />
+                              {subject.studentIds.length} students
+                            </span>
+                          </div>
+                          {subject.schedule && (
+                            <div className="mt-2.5 text-xs text-gray-600 border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-2 flex items-start gap-1.5">
+                              <Calendar size={11} className="mt-0.5 shrink-0" />
+                              <span className="break-words leading-relaxed">{subject.schedule}</span>
                             </div>
-                          </>
+                          )}
+                        </div>
+
+                        {currentUser?.role === "admin" && (
+                          <div className="flex items-center gap-2 self-start shrink-0">
+                            {editingSubjectId === subject.id ? (
+                              <>
+                                <button
+                                  onClick={() => saveEnrollmentChanges(subject.id)}
+                                  className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg transition-all transform hover:scale-105"
+                                  title="Save Enrollment"
+                                >
+                                  <Save size={18} />
+                                </button>
+                                <button
+                                  onClick={cancelEditEnrollment}
+                                  className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all transform hover:scale-105"
+                                  title="Cancel"
+                                >
+                                  <X size={18} />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => startEditEnrollment(subject)}
+                                className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-all transform hover:scale-105"
+                                title="Edit Enrolled Students"
+                              >
+                                <Pencil size={18} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeSubject(subject.id)}
+                              className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all transform hover:scale-105"
+                              title="Delete Subject"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         )}
                       </div>
-                      <div className="grid sm:grid-cols-2 gap-3 text-sm mt-3">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <User size={14} className="text-blue-500" />
-                          <span>Teacher: <span className="font-semibold">{subject.teacherName || "Unassigned"}</span></span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Users size={14} className="text-green-500" />
-                          <span>Enrolled: <span className="font-semibold">{subject.studentIds.length} students</span></span>
-                        </div>
-                      </div>
+
                       {subject.studentIds.length > 0 && editingSubjectId !== subject.id && (
-                        <div className="mt-3 flex flex-wrap gap-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                           <span className="text-xs text-gray-400">Enrolled IDs:</span>
-                          {subject.studentIds.slice(0, 5).map(id => {
-                            const student = students.find(s => s.id === id);
+                          {subject.studentIds.slice(0, 5).map((id) => {
+                            const student = students.find((s) => s.id === id);
                             return (
                               <span key={id} className="text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">
-                                {student?.name?.split(' ')[0] || id}
+                                {student?.name?.split(" ")[0] || id}
                               </span>
                             );
                           })}
@@ -685,47 +834,9 @@ const SubjectsPage = ({ currentUser }) => {
                         </div>
                       )}
                     </div>
-
-                    {currentUser?.role === "admin" && (
-                      <div className="flex items-center gap-2 self-start">
-                        {editingSubjectId === subject.id ? (
-                          <>
-                            <button
-                              onClick={() => saveEnrollmentChanges(subject.id)}
-                              className="p-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg transition-all transform hover:scale-105"
-                              title="Save Enrollment"
-                            >
-                              <Save size={18} />
-                            </button>
-                            <button
-                              onClick={cancelEditEnrollment}
-                              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all transform hover:scale-105"
-                              title="Cancel"
-                            >
-                              <X size={18} />
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => startEditEnrollment(subject)}
-                            className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-all transform hover:scale-105"
-                            title="Edit Enrolled Students"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => removeSubject(subject.id)}
-                          className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-all transform hover:scale-105"
-                          title="Delete Subject"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    )}
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
 

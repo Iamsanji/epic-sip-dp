@@ -13,7 +13,9 @@ import {
 const RegisterStudentPage = ({ currentUser }) => {
   const [form, setForm] = useState({
     id: "",
-    name: "",
+    firstName: "",
+    middleInitial: "",
+    lastName: "",
     course: "",
     yearLevel: "",
     section: "",
@@ -30,21 +32,58 @@ const RegisterStudentPage = ({ currentUser }) => {
   }, [message]);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    if (name === "middleInitial") {
+      setForm({ ...form, middleInitial: value.replace(/\./g, "").slice(0, 2).toUpperCase() });
+      return;
+    }
+
+    setForm({ ...form, [name]: value });
+  };
+
+  const buildDisplayName = (firstName, middleInitial, lastName) => {
+    const safeFirstName = String(firstName || "").trim();
+    const safeLastName = String(lastName || "").trim();
+    const safeMiddleInitial = String(middleInitial || "")
+      .trim()
+      .replace(/\./g, "")
+      .slice(0, 2)
+      .toUpperCase();
+
+    if (!safeFirstName || !safeLastName) {
+      return "";
+    }
+
+    return [safeFirstName, safeMiddleInitial ? `${safeMiddleInitial}.` : "", safeLastName]
+      .filter(Boolean)
+      .join(" ");
   };
 
   const registerStudent = (e) => {
     e.preventDefault();
 
+    const normalizedFirstName = String(form.firstName || "").trim();
+    const normalizedLastName = String(form.lastName || "").trim();
+    const normalizedMiddleInitial = String(form.middleInitial || "")
+      .trim()
+      .replace(/\./g, "")
+      .slice(0, 2)
+      .toUpperCase();
+    const normalizedName = buildDisplayName(normalizedFirstName, normalizedMiddleInitial, normalizedLastName);
+
     const normalizedForm = {
       id: String(form.id || "").trim(),
-      name: String(form.name || "").trim(),
+      firstName: normalizedFirstName,
+      middleInitial: normalizedMiddleInitial,
+      lastName: normalizedLastName,
+      name: normalizedName,
       course: String(form.course || "").trim(),
       year: String(form.yearLevel || "").trim(),
       section: String(form.section || "").trim(),
     };
     
-    if (!normalizedForm.id || !normalizedForm.name || !normalizedForm.course) {
+    if (!normalizedForm.id || !normalizedForm.firstName || !normalizedForm.lastName || !normalizedForm.course) {
       setMessage({ text: "Please complete all required fields.", type: "error" });
       return;
     }
@@ -68,7 +107,7 @@ const RegisterStudentPage = ({ currentUser }) => {
       setSavedStudent(newStudent);
       setMessage({ text: "Student registered successfully!", type: "success" });
       setForm({ 
-        id: "", name: "", course: "", yearLevel: "", section: ""
+        id: "", firstName: "", middleInitial: "", lastName: "", course: "", yearLevel: "", section: ""
       });
       
     } catch (err) {
@@ -135,18 +174,34 @@ const RegisterStudentPage = ({ currentUser }) => {
                 />
               </div>
 
-              {/* Full Name */}
+              {/* Student Name */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
+                  Student Name
                 </label>
-                <input
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder="e.g., Juan Dela Cruz"
-                  className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
-                />
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <input
+                    name="firstName"
+                    value={form.firstName}
+                    onChange={handleChange}
+                    placeholder="First Name *"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
+                  />
+                  <input
+                    name="middleInitial"
+                    value={form.middleInitial}
+                    onChange={handleChange}
+                    placeholder="M.I. (Optional, up to 2 letters)"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
+                  />
+                  <input
+                    name="lastName"
+                    value={form.lastName}
+                    onChange={handleChange}
+                    placeholder="Last Name *"
+                    className="w-full p-3 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all"
+                  />
+                </div>
               </div>
 
               {/* Course */}

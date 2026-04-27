@@ -318,9 +318,35 @@ export const getLocalDateISO = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeMiddleInitial = (middleInitial) =>
+  String(middleInitial || '')
+    .trim()
+    .replace(/\./g, '')
+    .slice(0, 2)
+    .toUpperCase();
+
+const buildDisplayName = (firstName, lastName, middleInitial = '') => {
+  const safeFirstName = String(firstName || '').trim();
+  const safeLastName = String(lastName || '').trim();
+  const safeMiddleInitial = normalizeMiddleInitial(middleInitial);
+
+  if (!safeFirstName || !safeLastName) {
+    return '';
+  }
+
+  return [safeFirstName, safeMiddleInitial ? `${safeMiddleInitial}.` : '', safeLastName]
+    .filter(Boolean)
+    .join(' ');
+};
+
 const normalizeStudent = (student) => ({
+  firstName: String(student?.firstName ?? '').trim(),
+  middleInitial: normalizeMiddleInitial(student?.middleInitial),
+  lastName: String(student?.lastName ?? '').trim(),
   id: String(student?.id ?? '').trim(),
-  name: String(student?.name ?? '').trim(),
+  name:
+    String(student?.name ?? '').trim() ||
+    buildDisplayName(student?.firstName, student?.lastName, student?.middleInitial),
   course: String(student?.course ?? '').trim(),
   year: String(student?.year ?? '').trim(),
   section: String(student?.section ?? '').trim(),
@@ -561,8 +587,13 @@ export const saveSettings = (settings) => {
 };
 
 const normalizeUser = (user) => ({
+  firstName: String(user?.firstName || '').trim(),
+  middleInitial: normalizeMiddleInitial(user?.middleInitial),
+  lastName: String(user?.lastName || '').trim(),
   id: String(user?.id || '').trim(),
-  name: String(user?.name || '').trim(),
+  name:
+    String(user?.name || '').trim() ||
+    buildDisplayName(user?.firstName, user?.lastName, user?.middleInitial),
   role: String(user?.role || '').trim().toLowerCase(),
   username: String(user?.username || '').trim(),
   password: String(user?.password || '').trim(),
@@ -716,13 +747,16 @@ export const saveUsers = (users) => {
   notifyDataChanged();
 };
 
-export const createTeacherAccount = ({ name, username, password }, actor = null) => {
-  const safeName = String(name || '').trim();
+export const createTeacherAccount = ({ firstName, middleInitial, lastName, name, username, password }, actor = null) => {
+  const safeFirstName = String(firstName || '').trim();
+  const safeMiddleInitial = normalizeMiddleInitial(middleInitial);
+  const safeLastName = String(lastName || '').trim();
+  const safeName = String(name || '').trim() || buildDisplayName(safeFirstName, safeLastName, safeMiddleInitial);
   const safeUsername = String(username || '').trim();
   const safePassword = String(password || '').trim();
 
-  if (!safeName || !safeUsername || !safePassword) {
-    throw new Error('Name, username, and password are required.');
+  if (!safeFirstName || !safeLastName || !safeUsername || !safePassword) {
+    throw new Error('First name, last name, username, and password are required.');
   }
 
   const users = getUsers();
@@ -733,6 +767,9 @@ export const createTeacherAccount = ({ name, username, password }, actor = null)
 
   const nextTeacher = normalizeUser({
     id: `teacher-${Date.now()}`,
+    firstName: safeFirstName,
+    middleInitial: safeMiddleInitial,
+    lastName: safeLastName,
     name: safeName,
     role: 'teacher',
     username: safeUsername,
@@ -756,7 +793,7 @@ export const createTeacherAccount = ({ name, username, password }, actor = null)
 
 export const updateTeacherAccount = (
   teacherId,
-  { name, username, password },
+  { firstName, middleInitial, lastName, name, username, password },
   actor = null
 ) => {
   const safeTeacherId = String(teacherId || '').trim();
@@ -771,12 +808,18 @@ export const updateTeacherAccount = (
   }
 
   const current = users[index];
-  const nextName = String(name ?? current.name).trim();
+  const nextFirstName = String(firstName ?? current.firstName).trim();
+  const nextMiddleInitial = normalizeMiddleInitial(middleInitial ?? current.middleInitial);
+  const nextLastName = String(lastName ?? current.lastName).trim();
+  const nextName =
+    String(name ?? '').trim() ||
+    buildDisplayName(nextFirstName, nextLastName, nextMiddleInitial) ||
+    String(current.name).trim();
   const nextUsername = String(username ?? current.username).trim();
   const nextPassword = String(password ?? current.password).trim();
 
-  if (!nextName || !nextUsername || !nextPassword) {
-    throw new Error('Name, username, and password are required.');
+  if (!nextFirstName || !nextLastName || !nextName || !nextUsername || !nextPassword) {
+    throw new Error('First name, last name, username, and password are required.');
   }
 
   const usernameTaken = users.some(
@@ -789,6 +832,9 @@ export const updateTeacherAccount = (
 
   const updated = normalizeUser({
     ...current,
+    firstName: nextFirstName,
+    middleInitial: nextMiddleInitial,
+    lastName: nextLastName,
     name: nextName,
     username: nextUsername,
     password: nextPassword,

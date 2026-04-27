@@ -137,7 +137,7 @@ const SessionsPage = ({ currentUser }) => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Open Sessions</p>
@@ -150,7 +150,7 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-xs text-gray-400 mt-2">Ready for QR scans</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Subjects</p>
@@ -163,7 +163,7 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-xs text-gray-400 mt-2">Available in your view</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Total Sessions</p>
@@ -176,7 +176,7 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-xs text-gray-400 mt-2">Tracked session history</p>
           </div>
 
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Enrolled Students</p>
@@ -191,7 +191,7 @@ const SessionsPage = ({ currentUser }) => {
         </div>
 
         {/* Subject Controls */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden mb-6">
+        <div className="ui-card shadow-xl overflow-hidden mb-6">
           <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
             <div className="flex items-center gap-2">
               <PlayCircle className="text-white" size={20} />
@@ -200,7 +200,7 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-red-100 text-sm mt-1">Start or close attendance sessions for each subject</p>
           </div>
 
-          <div className="p-6">
+          <div className="ui-panel-pad">
             <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4">
               <p className="text-sm font-bold text-red-700">Session Timing Rules</p>
               <p className="text-xs text-red-600 mt-1">
@@ -246,7 +246,7 @@ const SessionsPage = ({ currentUser }) => {
                 </p>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
                 {visibleSubjects.map((subject) => {
                   const activeSession = visibleSessions.find(
                     (item) => item.subjectId === subject.id && item.status === "OPEN"
@@ -257,38 +257,34 @@ const SessionsPage = ({ currentUser }) => {
                   return (
                     <div 
                       key={subject.id} 
-                      className={`rounded-xl border-2 transition-all duration-200 ${
+                      className={`ui-card h-full border-2 transition-all duration-200 ${
                         activeSession 
                           ? "border-green-300 bg-gradient-to-br from-green-50 to-white shadow-md" 
                           : "border-gray-100 bg-white hover:border-red-200 hover:shadow-md"
                       }`}
                     >
-                      <div className="p-4">
+                      <div className="ui-card-pad h-full flex flex-col">
                         <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0 ui-meta-stack">
+                            <div className="ui-meta-row !border-0 !pt-0 !text-gray-900 !text-base !font-black !items-center !gap-2">
                               <BookOpen size={14} className={activeSession ? "text-green-600" : "text-gray-400"} />
-                              <p className="font-black text-gray-900 text-lg">{subject.code}</p>
+                              <p className="leading-none">{subject.code}</p>
                             </div>
-                            <p className="text-sm text-gray-600 mt-1 line-clamp-1">{subject.title}</p>
-                            <div className="flex items-center gap-3 mt-2">
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <p className="text-sm text-gray-700 leading-snug break-words line-clamp-2">{subject.title}</p>
+                            <div className="ui-meta-row !items-center !border-0 !pt-0">
+                              <span className="ui-status-badge ui-status-closed !text-gray-600 !bg-gray-50 !border-gray-200 !normal-case !font-semibold">
                                 <Users size={10} />
                                 {subject.studentIds?.length || 0} students
                               </span>
-                              {subject.schedule && (
-                                <span className="text-xs text-gray-500 flex items-center gap-1">
-                                  <Clock size={10} />
-                                  {subject.schedule}
-                                </span>
-                              )}
                             </div>
+                            {subject.schedule && (
+                              <div className="ui-meta-row text-xs text-gray-600 border border-gray-200 bg-gray-50 rounded-lg px-2.5 py-2 !border-t-0 !pt-2 !gap-1.5">
+                                <Clock size={11} className="mt-0.5 shrink-0" />
+                                <span className="break-words leading-relaxed">{subject.schedule}</span>
+                              </div>
+                            )}
                           </div>
-                          <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${
-                            activeSession 
-                              ? "bg-green-100 text-green-700 border border-green-200" 
-                              : "bg-gray-100 text-gray-500"
-                          }`}>
+                          <span className={`ui-status-badge ${activeSession ? "ui-status-open" : "ui-status-closed"}`}>
                             {activeSession ? "● OPEN" : "○ CLOSED"}
                           </span>
                         </div>
@@ -330,19 +326,19 @@ const SessionsPage = ({ currentUser }) => {
                           </div>
                         )}
 
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <div className="flex items-center justify-between text-xs">
+                        <div className="mt-auto pt-3 border-t border-gray-100 ui-meta-stack">
+                          <div className="ui-meta-row !items-center !justify-between text-xs !border-0 !pt-0">
                             <span className="text-gray-400">Last session:</span>
-                            <span className="text-gray-600 font-medium">
+                            <span className="text-gray-600 font-medium text-right max-w-[65%] break-words">
                               {latestSession 
                                 ? `${latestSession.dateISO} ${latestSession.startTime}` 
                                 : "No sessions yet"}
                             </span>
                           </div>
                           {latestSession && (
-                            <div className="mt-1 flex items-center justify-between text-xs">
+                            <div className="ui-meta-row !items-center !justify-between text-xs !mt-0">
                               <span className="text-gray-400">Timing:</span>
-                              <span className="text-gray-600 font-medium">
+                              <span className="text-gray-600 font-medium text-right max-w-[65%] break-words">
                                 Late {latestSession.lateCutoffTime || "-"} • Close {latestSession.closeTime || "-"}
                               </span>
                             </div>
@@ -358,7 +354,7 @@ const SessionsPage = ({ currentUser }) => {
         </div>
 
         {/* Session History */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
+        <div className="ui-card shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
             <div className="flex items-center gap-2">
               <TimerReset className="text-white" size={20} />
@@ -370,7 +366,7 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-red-100 text-sm mt-1">Complete history of all attendance sessions</p>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="ui-panel-pad">
             {visibleSessions.length === 0 ? (
               <div className="text-center py-12">
                 <CalendarDays className="w-16 h-16 text-gray-300 mx-auto mb-3" />
@@ -378,58 +374,55 @@ const SessionsPage = ({ currentUser }) => {
                 <p className="text-gray-300 text-sm mt-1">Start your first attendance session</p>
               </div>
             ) : (
-              visibleSessions.map((session) => (
-                <div key={session.id} className="p-5 hover:bg-red-50/30 transition-all duration-200">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <BookOpen size={14} className="text-red-600" />
-                        <p className="font-bold text-gray-900">
-                          {session.subjectCode} - {session.subjectTitle}
-                        </p>
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <CalendarDays size={12} />
-                          <span>{session.dateISO}</span>
+              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
+                {visibleSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className="ui-card h-full border-2 border-gray-100 bg-white hover:border-red-200 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="ui-card-pad h-full flex flex-col">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <BookOpen size={14} className="text-red-500" />
+                            <p className="font-black text-gray-900 text-sm leading-none">{session.subjectCode}</p>
+                          </div>
+                          <p className="mt-1.5 text-sm text-gray-700 leading-snug break-words line-clamp-2">
+                            {session.subjectTitle}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <Clock size={12} />
-                          <span>
-                            {session.startTime} 
-                            {session.endTime ? ` → ${session.endTime}` : " (Active)"}
+                        <span className={`ui-status-badge ${session.status === "OPEN" ? "ui-status-open" : "ui-status-closed"}`}>
+                          {session.status === "OPEN" ? "● OPEN" : "○ CLOSED"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 ui-meta-stack">
+                        <div className="ui-meta-row">
+                          <CalendarDays size={12} className="mt-0.5 shrink-0" />
+                          <span className="break-words">{session.dateISO}</span>
+                        </div>
+                        <div className="ui-meta-row">
+                          <Clock size={12} className="mt-0.5 shrink-0" />
+                          <span className="break-words">
+                            {session.startTime}
+                            {session.endTime ? ` -> ${session.endTime}` : " (Active)"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <Clock size={12} />
-                          <span>
-                            Late: {session.lateCutoffTime || "-"} • Close: {session.closeTime || "-"}
+                        <div className="ui-meta-row">
+                          <Clock size={12} className="mt-0.5 shrink-0" />
+                          <span className="break-words">
+                            Late: {session.lateCutoffTime || "-"} | Close: {session.closeTime || "-"}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <Users size={12} />
-                          <span>Teacher: {session.teacherName}</span>
+                        <div className="ui-meta-row">
+                          <Users size={12} className="mt-0.5 shrink-0" />
+                          <span className="break-words">Teacher: {session.teacherName}</span>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-black uppercase px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                          session.status === "OPEN" 
-                            ? "bg-green-100 text-green-700 border border-green-200" 
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {session.status === "OPEN" ? (
-                          <><div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></div> OPEN</>
-                        ) : (
-                          <><div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div> CLOSED</>
-                        )}
-                      </span>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
 
@@ -445,7 +438,7 @@ const SessionsPage = ({ currentUser }) => {
           )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden mt-6">
+        <div className="ui-card shadow-xl overflow-hidden mt-6">
           <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
             <div className="flex items-center gap-2">
               <Activity className="text-white" size={20} />
@@ -454,22 +447,27 @@ const SessionsPage = ({ currentUser }) => {
             <p className="text-red-100 text-sm mt-1">Persistent history for session starts and closures</p>
           </div>
 
-          <div className="divide-y divide-gray-100">
+          <div className="ui-panel-pad">
             {recentSessionAudit.length === 0 ? (
               <div className="text-center py-10">
                 <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                 <p className="text-gray-400 font-medium">No session audit events yet</p>
               </div>
             ) : (
-              recentSessionAudit.map((log) => (
-                <div key={log.id} className="p-4">
-                  <p className="text-sm font-bold text-gray-900">{log.action.replaceAll("_", " ")}</p>
-                  <p className="text-sm text-gray-600">{log.details || "No details"}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(log.timestamp).toLocaleString()} • {log.actorName || "System"}
-                  </p>
-                </div>
-              ))
+              <div className="grid md:grid-cols-2 gap-4 items-stretch">
+                {recentSessionAudit.map((log) => (
+                  <div
+                    key={log.id}
+                    className="ui-card h-full border-gray-200 bg-gray-50/70 ui-card-pad hover:border-red-200 hover:bg-red-50/40 transition-all"
+                  >
+                    <p className="text-sm font-bold text-gray-900 break-words">{log.action.replaceAll("_", " ")}</p>
+                    <p className="text-sm text-gray-600 mt-1 break-words">{log.details || "No details"}</p>
+                    <p className="text-xs text-gray-400 mt-2 break-words">
+                      {new Date(log.timestamp).toLocaleString()} • {log.actorName || "System"}
+                    </p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

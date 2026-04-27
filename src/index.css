@@ -1,1 +1,71 @@
 @import "tailwindcss";
+
+.ui-card {
+	border-radius: 1rem;
+	border: 1px solid #fee2e2;
+	background: #ffffff;
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.ui-card-pad {
+	padding: 1rem;
+}
+
+.ui-panel-pad {
+	padding: 1rem;
+}
+
+.ui-status-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	border-radius: 9999px;
+	border: 1px solid transparent;
+	padding: 0.2rem 0.6rem;
+	font-size: 0.68rem;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.ui-status-open {
+	border-color: #bbf7d0;
+	background: #dcfce7;
+	color: #15803d;
+}
+
+.ui-status-closed {
+	border-color: #e5e7eb;
+	background: #f3f4f6;
+	color: #4b5563;
+}
+
+.ui-meta-stack {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.ui-meta-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.45rem;
+	font-size: 0.75rem;
+	color: #4b5563;
+}
+
+.ui-meta-row + .ui-meta-row {
+	border-top: 1px dashed #e5e7eb;
+	padding-top: 0.4rem;
+}
+
+@media (min-width: 640px) {
+	.ui-card-pad {
+		padding: 1.25rem;
+	}
+
+	.ui-panel-pad {
+		padding: 1.5rem;
+	}
+}

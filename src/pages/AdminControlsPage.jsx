@@ -9,7 +9,54 @@ import {
   updateTeacherAccount,
 } from "../utils/localStorageUtils";
 
-const emptyTeacherForm = { name: "", username: "", password: "" };
+const emptyTeacherForm = {
+  firstName: "",
+  middleInitial: "",
+  lastName: "",
+  username: "",
+  password: "",
+};
+
+const splitTeacherName = (teacher) => {
+  const safeFirstName = String(teacher?.firstName || "").trim();
+  const safeMiddleInitial = String(teacher?.middleInitial || "")
+    .trim()
+    .replace(/\./g, "")
+    .slice(0, 2)
+    .toUpperCase();
+  const safeLastName = String(teacher?.lastName || "").trim();
+
+  if (safeFirstName && safeLastName) {
+    return {
+      firstName: safeFirstName,
+      middleInitial: safeMiddleInitial,
+      lastName: safeLastName,
+    };
+  }
+
+  const nameParts = String(teacher?.name || "").trim().split(/\s+/).filter(Boolean);
+  if (nameParts.length === 0) {
+    return {
+      firstName: "",
+      middleInitial: safeMiddleInitial,
+      lastName: "",
+    };
+  }
+
+  if (nameParts.length === 1) {
+    return {
+      firstName: nameParts[0],
+      middleInitial: safeMiddleInitial,
+      lastName: "",
+    };
+  }
+
+  return {
+    firstName: nameParts[0],
+    middleInitial: safeMiddleInitial,
+    lastName: nameParts.slice(1).join(" "),
+  };
+};
 
 const AdminControlsPage = ({ currentUser }) => {
   const [teachers, setTeachers] = useState([]);
@@ -81,9 +128,13 @@ const AdminControlsPage = ({ currentUser }) => {
   };
 
   const onEditTeacher = (teacher) => {
+    const parsedName = splitTeacherName(teacher);
+
     setEditingTeacherId(teacher.id);
     setTeacherForm({
-      name: teacher.name,
+      firstName: parsedName.firstName,
+      middleInitial: parsedName.middleInitial,
+      lastName: parsedName.lastName,
       username: teacher.username,
       password: teacher.password,
     });
@@ -128,12 +179,31 @@ const AdminControlsPage = ({ currentUser }) => {
           </div>
 
           <form onSubmit={onSubmitTeacher} className="space-y-3 mb-5">
-            <input
-              value={teacherForm.name}
-              onChange={(e) => setTeacherForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="w-full rounded-xl border border-gray-200 p-3"
-              placeholder="Teacher full name"
-            />
+            <div className="grid sm:grid-cols-3 gap-2">
+              <input
+                value={teacherForm.firstName}
+                onChange={(e) => setTeacherForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 p-3"
+                placeholder="First Name *"
+              />
+              <input
+                value={teacherForm.middleInitial}
+                onChange={(e) =>
+                  setTeacherForm((prev) => ({
+                    ...prev,
+                    middleInitial: e.target.value.replace(/\./g, "").slice(0, 2).toUpperCase(),
+                  }))
+                }
+                className="w-full rounded-xl border border-gray-200 p-3"
+                placeholder="M.I. (Optional, up to 2 letters)"
+              />
+              <input
+                value={teacherForm.lastName}
+                onChange={(e) => setTeacherForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                className="w-full rounded-xl border border-gray-200 p-3"
+                placeholder="Last Name *"
+              />
+            </div>
             <input
               value={teacherForm.username}
               onChange={(e) => setTeacherForm((prev) => ({ ...prev, username: e.target.value }))}

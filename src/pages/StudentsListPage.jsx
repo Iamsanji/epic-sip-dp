@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, Trash2, Edit, Save, XCircle, Users, Download, Filter, ChevronLeft, ChevronRight, GraduationCap, AlertCircle } from "lucide-react";
 import {
   deleteStudentAndAttendance,
@@ -10,10 +10,14 @@ import {
 
 const StudentsListPage = ({ currentUser }) => {
   const [students, setStudents] = useState([]);
+  const [filterSubjects, setFilterSubjects] = useState([]);
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
     id: "",
+    firstName: "",
+    middleInitial: "",
+    lastName: "",
     name: "",
     course: "",
     year: "",
@@ -23,22 +27,26 @@ const StudentsListPage = ({ currentUser }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [yearFilter, setYearFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
 
   // Load from LocalStorage
   useEffect(() => {
     const syncStudents = () => {
       const allStudents = getStudents();
+      const allSubjects = getSubjects();
 
       if (currentUser?.role === "teacher") {
+        const teacherSubjects = allSubjects.filter((subject) => subject.teacherId === currentUser.id);
         const teacherSubjectIds = new Set(
-          getSubjects()
-            .filter((subject) => subject.teacherId === currentUser.id)
+          teacherSubjects
             .flatMap((subject) => subject.studentIds || [])
         );
+        setFilterSubjects(teacherSubjects);
         setStudents(allStudents.filter((student) => teacherSubjectIds.has(student.id)));
         return;
       }
 
+      setFilterSubjects(allSubjects);
       setStudents(allStudents);
     };
 
@@ -49,6 +57,79 @@ const StudentsListPage = ({ currentUser }) => {
       window.removeEventListener("attendance:data-changed", syncStudents);
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!subjectFilter) {
+      return;
+    }
+
+    const isValidSubject = filterSubjects.some((subject) => subject.id === subjectFilter);
+    if (!isValidSubject) {
+      setSubjectFilter("");
+    }
+  }, [filterSubjects, subjectFilter]);
+
+  const subjectStudentMap = useMemo(() => {
+    const map = new Map();
+
+    filterSubjects.forEach((subject) => {
+      map.set(subject.id, new Set((subject.studentIds || []).map((id) => String(id || "").trim())));
+    });
+
+    return map;
+  }, [filterSubjects]);
+
+  const splitStudentName = (student) => {
+    const safeFirstName = String(student?.firstName || "").trim();
+    const safeMiddleInitial = String(student?.middleInitial || "")
+      .trim()
+      .replace(/\./g, "")
+      .slice(0, 2)
+      .toUpperCase();
+    const safeLastName = String(student?.lastName || "").trim();
+
+    if (safeFirstName && safeLastName) {
+      return {
+        firstName: safeFirstName,
+        middleInitial: safeMiddleInitial,
+        lastName: safeLastName,
+      };
+    }
+
+    const nameParts = String(student?.name || "").trim().split(/\s+/).filter(Boolean);
+
+    if (nameParts.length <= 1) {
+      return {
+        firstName: nameParts[0] || "",
+        middleInitial: safeMiddleInitial,
+        lastName: "",
+      };
+    }
+
+    return {
+      firstName: nameParts[0],
+      middleInitial: safeMiddleInitial,
+      lastName: nameParts.slice(1).join(" "),
+    };
+  };
+
+  const buildDisplayName = (firstName, middleInitial, lastName) => {
+    const safeFirstName = String(firstName || "").trim();
+    const safeLastName = String(lastName || "").trim();
+    const safeMiddleInitial = String(middleInitial || "")
+      .trim()
+      .replace(/\./g, "")
+      .slice(0, 2)
+      .toUpperCase();
+
+    if (!safeFirstName || !safeLastName) {
+      return "";
+    }
+
+    return [safeFirstName, safeMiddleInitial ? `${safeMiddleInitial}.` : "", safeLastName]
+      .filter(Boolean)
+      .join(" ");
+  };
 
   // Save helper
   const saveToStorage = (data) => {
@@ -97,8 +178,16 @@ const StudentsListPage = ({ currentUser }) => {
       return;
     }
 
+    const parsedName = splitStudentName(student);
+
     setEditingId(student.id);
-    setEditForm(student);
+    setEditForm({
+      ...student,
+      firstName: parsedName.firstName,
+      middleInitial: parsedName.middleInitial,
+      lastName: parsedName.lastName,
+      name: student.name || buildDisplayName(parsedName.firstName, parsedName.middleInitial, parsedName.lastName),
+    });
   };
 
   // Save edit
@@ -109,17 +198,29 @@ const StudentsListPage = ({ currentUser }) => {
     }
 
     const originalStudent = students.find((student) => student.id === editingId);
+    const normalizedFirstName = String(editForm.firstName || "").trim();
+    const normalizedMiddleInitial = String(editForm.middleInitial || "")
+      .trim()
+      .replace(/\./g, "")
+      .slice(0, 2)
+      .toUpperCase();
+    const normalizedLastName = String(editForm.lastName || "").trim();
+    const normalizedName = buildDisplayName(normalizedFirstName, normalizedMiddleInitial, normalizedLastName);
+
     const normalizedEdit = {
       ...editForm,
       id: String(editForm.id || "").trim(),
-      name: String(editForm.name || "").trim(),
+      firstName: normalizedFirstName,
+      middleInitial: normalizedMiddleInitial,
+      lastName: normalizedLastName,
+      name: normalizedName,
       course: String(editForm.course || "").trim(),
       year: String(editForm.year || "").trim(),
       section: String(editForm.section || "").trim(),
     };
 
-    if (!normalizedEdit.id || !normalizedEdit.name || !normalizedEdit.course) {
-      setMessage({ type: "error", text: "❌ ID, Name, and Course are required." });
+    if (!normalizedEdit.id || !normalizedEdit.firstName || !normalizedEdit.lastName || !normalizedEdit.course) {
+      setMessage({ type: "error", text: "❌ ID, First Name, Last Name, and Course are required." });
       return;
     }
 
@@ -180,7 +281,8 @@ const StudentsListPage = ({ currentUser }) => {
     (s) =>
       (String(s.name || "").toLowerCase().includes(search.toLowerCase()) ||
       String(s.id || "").includes(search)) &&
-      (yearFilter === "" || s.year === yearFilter)
+      (yearFilter === "" || s.year === yearFilter) &&
+      (subjectFilter === "" || subjectStudentMap.get(subjectFilter)?.has(s.id))
   );
 
   // Pagination
@@ -191,7 +293,7 @@ const StudentsListPage = ({ currentUser }) => {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, yearFilter]);
+  }, [search, yearFilter, subjectFilter]);
 
   useEffect(() => {
     if (!message.text) {
@@ -228,7 +330,7 @@ const StudentsListPage = ({ currentUser }) => {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Total Students</p>
@@ -239,7 +341,7 @@ const StudentsListPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Active Students</p>
@@ -250,7 +352,7 @@ const StudentsListPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Courses</p>
@@ -261,7 +363,7 @@ const StudentsListPage = ({ currentUser }) => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-red-100 shadow-sm">
+          <div className="ui-card ui-card-pad">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs font-bold uppercase">Filtered</p>
@@ -275,7 +377,7 @@ const StudentsListPage = ({ currentUser }) => {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-2xl shadow-lg border border-red-100 p-4 mb-6">
+        <div className="ui-card shadow-lg ui-card-pad mb-6">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
@@ -297,6 +399,18 @@ const StudentsListPage = ({ currentUser }) => {
                 <option value="2">2nd Year</option>
                 <option value="3">3rd Year</option>
                 <option value="4">4th Year</option>
+              </select>
+              <select
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-200 focus:border-red-500 focus:ring-2 focus:ring-red-200 outline-none transition-all bg-white"
+              >
+                <option value="">All Subjects</option>
+                {filterSubjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.code} - {subject.title}
+                  </option>
+                ))}
               </select>
               <button
                 onClick={exportToCSV}
@@ -324,7 +438,7 @@ const StudentsListPage = ({ currentUser }) => {
         )}
 
         {/* Table / Cards */}
-        <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
+        <div className="ui-card shadow-xl overflow-hidden">
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gradient-to-r from-red-600 to-red-700 text-white">
@@ -365,13 +479,35 @@ const StudentsListPage = ({ currentUser }) => {
                       </td>
                       <td className="p-4 font-medium text-gray-900">
                         {editingId === student.id ? (
-                          <input
-                            className="border border-gray-300 p-1 rounded-md w-40 text-sm"
-                            value={editForm.name}
-                            onChange={(e) =>
-                              setEditForm({ ...editForm, name: e.target.value })
-                            }
-                          />
+                          <div className="grid grid-cols-3 gap-2">
+                            <input
+                              className="border border-gray-300 p-1 rounded-md w-24 text-sm"
+                              value={editForm.firstName}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, firstName: e.target.value })
+                              }
+                              placeholder="First"
+                            />
+                            <input
+                              className="border border-gray-300 p-1 rounded-md w-20 text-sm"
+                              value={editForm.middleInitial}
+                              onChange={(e) =>
+                                setEditForm({
+                                  ...editForm,
+                                  middleInitial: e.target.value.replace(/\./g, "").slice(0, 2).toUpperCase(),
+                                })
+                              }
+                              placeholder="M.I."
+                            />
+                            <input
+                              className="border border-gray-300 p-1 rounded-md w-24 text-sm"
+                              value={editForm.lastName}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, lastName: e.target.value })
+                              }
+                              placeholder="Last"
+                            />
+                          </div>
                         ) : (
                           student.name
                         )}
@@ -469,7 +605,7 @@ const StudentsListPage = ({ currentUser }) => {
             </table>
           </div>
 
-          <div className="md:hidden p-4 space-y-3">
+          <div className="md:hidden ui-card-pad space-y-3">
             {paginatedStudents.length === 0 ? (
               <div className="text-center p-8">
                 <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-2" />
@@ -489,9 +625,26 @@ const StudentsListPage = ({ currentUser }) => {
                       />
                       <input
                         className="w-full border border-gray-300 p-2 rounded-md text-sm"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        placeholder="Name"
+                        value={editForm.firstName}
+                        onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                        placeholder="First Name"
+                      />
+                      <input
+                        className="w-full border border-gray-300 p-2 rounded-md text-sm"
+                        value={editForm.middleInitial}
+                        onChange={(e) =>
+                          setEditForm({
+                            ...editForm,
+                            middleInitial: e.target.value.replace(/\./g, "").slice(0, 2).toUpperCase(),
+                          })
+                        }
+                        placeholder="M.I. (Optional, up to 2 letters)"
+                      />
+                      <input
+                        className="w-full border border-gray-300 p-2 rounded-md text-sm"
+                        value={editForm.lastName}
+                        onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                        placeholder="Last Name"
                       />
                       <input
                         className="w-full border border-gray-300 p-2 rounded-md text-sm"

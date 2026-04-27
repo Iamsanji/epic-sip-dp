@@ -265,9 +265,9 @@ const DashboardPage = ({ currentUser }) => {
         {/* Stats Grid - Modern Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {stats.map((stat, i) => (
-            <div key={i} className="group relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100">
+            <div key={i} className="ui-card group relative overflow-hidden hover:shadow-xl transition-all duration-300">
               <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.color} opacity-10 rounded-full transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500`}></div>
-              <div className="relative p-5">
+              <div className="ui-card-pad relative">
                 <div className="flex items-center justify-between mb-3">
                   <div className={`p-2 rounded-xl bg-gradient-to-br ${stat.color} bg-opacity-10`}>
                     <stat.icon className="w-5 h-5 text-red-600" />
@@ -286,8 +286,8 @@ const DashboardPage = ({ currentUser }) => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="ui-card overflow-hidden">
+            <div className="ui-panel-pad border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Open Sessions</h3>
                 <p className="text-sm text-gray-500 mt-1">
@@ -298,23 +298,23 @@ const DashboardPage = ({ currentUser }) => {
             </div>
             <div className="divide-y divide-gray-50">
               {openSessions.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400">No open sessions right now.</div>
+                <div className="ui-panel-pad text-sm text-gray-400">No open sessions right now.</div>
               ) : (
                 openSessions.slice(0, 5).map((session) => (
-                  <div key={session.id} className="p-4 flex items-center justify-between gap-3">
-                    <div>
+                  <div key={session.id} className="ui-card-pad flex items-center justify-between gap-3">
+                    <div className="ui-meta-stack">
                       <p className="font-semibold text-gray-900">{session.subjectCode}</p>
-                      <p className="text-sm text-gray-500">{session.subjectTitle}</p>
+                      <p className="ui-meta-row text-gray-500">{session.subjectTitle}</p>
                     </div>
-                    <span className="text-[11px] font-black uppercase px-2 py-1 rounded-full bg-red-100 text-red-700">OPEN</span>
+                    <span className="ui-status-badge ui-status-open">OPEN</span>
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="ui-card overflow-hidden">
+            <div className="ui-panel-pad border-b border-gray-100 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Subject Overview</h3>
                 <p className="text-sm text-gray-500 mt-1">
@@ -325,16 +325,16 @@ const DashboardPage = ({ currentUser }) => {
             </div>
             <div className="divide-y divide-gray-50">
               {subjectOverview.length === 0 ? (
-                <div className="p-6 text-sm text-gray-400">No subjects available.</div>
+                <div className="ui-panel-pad text-sm text-gray-400">No subjects available.</div>
               ) : (
                 subjectOverview.map((subject) => (
-                  <div key={subject.id} className="p-4 flex items-center justify-between gap-3">
-                    <div>
+                  <div key={subject.id} className="ui-card-pad flex items-center justify-between gap-3">
+                    <div className="ui-meta-stack">
                       <p className="font-semibold text-gray-900">{subject.code}</p>
-                      <p className="text-sm text-gray-500">{subject.title}</p>
-                      <p className="text-xs text-gray-400 mt-1">{subject.teacherName || 'Unassigned'} • {subject.enrolled} enrolled</p>
+                      <p className="ui-meta-row text-gray-500">{subject.title}</p>
+                      <p className="ui-meta-row text-gray-400">{subject.teacherName || 'Unassigned'} • {subject.enrolled} enrolled</p>
                     </div>
-                    <span className={`text-[11px] font-black uppercase px-2 py-1 rounded-full ${subject.sessionStatus === 'OPEN' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`ui-status-badge ${subject.sessionStatus === 'OPEN' ? 'ui-status-open' : 'ui-status-closed'}`}>
                       {subject.sessionStatus}
                     </span>
                   </div>
@@ -347,7 +347,7 @@ const DashboardPage = ({ currentUser }) => {
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Attendance Overview Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 hover:shadow-md transition-shadow">
+          <div className="ui-card ui-panel-pad hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Attendance Overview</h3>
@@ -413,8 +413,8 @@ const DashboardPage = ({ currentUser }) => {
         </div>
 
         {/* Recent Activity Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+        <div className="ui-card overflow-hidden">
+          <div className="ui-panel-pad border-b border-gray-100 flex justify-between items-center">
             <div>
               <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
                 <p className="text-sm text-gray-500 mt-1">
@@ -504,8 +504,8 @@ const DashboardPage = ({ currentUser }) => {
         </div>
 
         {/* Subject Analytics Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100">
+        <div className="ui-card overflow-hidden">
+          <div className="ui-panel-pad border-b border-gray-100">
             <h3 className="text-lg font-bold text-gray-900">Subject Analytics</h3>
             <p className="text-sm text-gray-500 mt-1">
               {isTeacherView ? 'Performance breakdown for your subjects' : 'Performance breakdown by subject'}
